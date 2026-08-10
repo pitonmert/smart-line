@@ -1,0 +1,63 @@
+# Satır sonu normalleştirme
+* text=auto
+
+# C# kaynak dosyaları
+*.cs text diff=csharp
+*.csx text diff=csharp
+*.cake text diff=csharp
+
+# Proje ve çözüm dosyaları
+*.sln text eol=crlf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+
+# Yapılandırma dosyaları
+*.json text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.config text eol=lf
+
+# Web dosyaları
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+
+# Markdown ve dokümantasyon
+*.md text eol=lf
+*.txt text eol=lf
+
+# Shell script dosyaları
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows script dosyaları
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Resim dosyaları (binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+
+# Font dosyaları (binary)
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Sıkıştırılmış dosyalar (binary)
+*.zip binary
+*.gz binary
+*.tar binary
+
+# DLL ve derlenmiş dosyalar (binary)
+*.dll binary
+*.exe binary
+*.pdb binary

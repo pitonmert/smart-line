@@ -1,0 +1,144 @@
+name: smartline
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    entrypoint: ["/mosquitto/entrypoint.sh"]
+    environment:
+      MQTT_API_PASSWORD: ${MQTT_API_PASSWORD}
+      MQTT_FIRMWARE_PASSWORD: ${MQTT_FIRMWARE_PASSWORD}
+      MQTT_VISION_PASSWORD: ${MQTT_VISION_PASSWORD}
+    volumes:
+      - ./infra/mosquitto/config:/mosquitto/config:ro
+      - ./infra/mosquitto/entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/mosquitto/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/mosquitto.crt:/mosquitto/cert-source/mosquitto.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/mosquitto.key:/mosquitto/cert-source/mosquitto.key:ro
+      - mosquitto_data:/mosquitto/data
+    tmpfs:
+      - /mosquitto/runtime:size=1m,mode=0700
+    ports:
+      - "8883:8883"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8883"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks: [backend]
+
+  api:
+    build:
+      context: ./SmartLine.API
+      dockerfile: Dockerfile
+      target: final
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 5047
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Mqtt__BrokerAddress: mosquitto
+      Mqtt__Port: 8883
+      Mqtt__ClientId: smartline-api
+      Mqtt__Username: smartline-api
+      Mqtt__Password: ${MQTT_API_PASSWORD}
+      Mqtt__CaCertificatePath: /run/smartline/certs/ca.crt
+      Mqtt__ClientCertificatePath: /run/smartline/certs/smartline-api.crt
+      Mqtt__ClientKeyPath: /run/smartline/certs/smartline-api.key
+      DeviceAuthentication__Key: ${DEVICE_KEY}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL}
+      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD}
+      ReverseProxy__KnownProxy: 172.30.0.10
+    volumes:
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.crt:/run/smartline/cert-source/smartline-api.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.key:/run/smartline/cert-source/smartline-api.key:ro
+    tmpfs:
+      - /run/smartline/certs:size=1m,mode=0700
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:5047/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks: [backend, frontend]
+
+  vision:
+    build:
+      context: ./SmartLine.Vision
+      dockerfile: Dockerfile
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 8883
+      MQTT_CLIENT_ID: smartline-vision
+      MQTT_USERNAME: smartline-vision
+      MQTT_PASSWORD: ${MQTT_VISION_PASSWORD}
+      MQTT_CA_CERT_PATH: /run/smartline/certs/ca.crt
+      MQTT_CLIENT_CERT_PATH: /run/smartline/certs/smartline-vision.crt
+      MQTT_CLIENT_KEY_PATH: /run/smartline/certs/smartline-vision.key
+      CAM_STREAM_URL: ${CAM_STREAM_URL}
+      LOG_LEVEL: INFO
+      SHOW_PREVIEW: "false"
+    volumes:
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-vision.crt:/run/smartline/cert-source/smartline-vision.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-vision.key:/run/smartline/cert-source/smartline-vision.key:ro
+    tmpfs:
+      - /run/smartline/certs:size=1m,mode=0700
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [backend]
+
+  caddy:
+    build:
+      context: .
+      dockerfile: infra/caddy/Dockerfile
+    volumes:
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.crt:/etc/caddy/certs/smartline.local.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.key:/etc/caddy/certs/smartline.local.key:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      frontend:
+        ipv4_address: 172.30.0.10
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+
+networks:
+  backend:
+  frontend:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

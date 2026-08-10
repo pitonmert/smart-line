@@ -1,0 +1,25 @@
+# The root build context is used only by infra/caddy/Dockerfile. Start from a
+# deny-all policy so repository history, environment files, generated private
+# keys, firmware credentials, dependencies, and build outputs cannot enter it.
+**
+
+!.dockerignore
+
+!infra/
+!infra/caddy/
+!infra/caddy/Caddyfile
+!infra/caddy/Dockerfile
+
+!SmartLine.Dashboard/
+!SmartLine.Dashboard/package.json
+!SmartLine.Dashboard/package-lock.json
+!SmartLine.Dashboard/index.html
+!SmartLine.Dashboard/eslint.config.js
+!SmartLine.Dashboard/tsconfig.app.json
+!SmartLine.Dashboard/tsconfig.json
+!SmartLine.Dashboard/tsconfig.node.json
+!SmartLine.Dashboard/vite.config.ts
+!SmartLine.Dashboard/public/
+!SmartLine.Dashboard/public/**
+!SmartLine.Dashboard/src/
+!SmartLine.Dashboard/src/**

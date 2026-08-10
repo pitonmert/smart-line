@@ -1,0 +1,11 @@
+title = "SmartLine gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives: documentation prose and placeholder template files"
+paths = [
+  '''docs/roadmap\.md''',
+  '''SmartLine\.Firmware/include/.*\.h\.example''',
+]

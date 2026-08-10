@@ -1,0 +1,279 @@
+@SmartLine.API_HostAddress = http://localhost:5047
+@AccessToken = replace-with-login-access-token
+@DeviceKey = replace-with-development-device-key
+
+### Login (refresh token Secure/HttpOnly cookie olarak döner)
+POST {{SmartLine.API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@example.local",
+  "password": "replace-with-operator-password"
+}
+
+###
+
+### Refresh
+POST {{SmartLine.API_HostAddress}}/api/auth/refresh
+Accept: application/json
+
+###
+
+### ============================================================
+### DASHBOARD
+### ============================================================
+
+### Dashboard özet verisi
+GET {{SmartLine.API_HostAddress}}/api/dashboard
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ============================================================
+### CONVEYOR (KONVEYÖR)
+### ============================================================
+
+### Konveyör durumunu getir
+GET {{SmartLine.API_HostAddress}}/api/conveyor/status
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Konveyörü başlat
+POST {{SmartLine.API_HostAddress}}/api/conveyor/start
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Konveyörü durdur
+POST {{SmartLine.API_HostAddress}}/api/conveyor/stop
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Acil durdurma (normal control limiter'dan bağımsız)
+POST {{SmartLine.API_HostAddress}}/api/conveyor/emergency-stop
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Acil durdurma reseti (Admin; konveyörü başlatmaz)
+POST {{SmartLine.API_HostAddress}}/api/conveyor/emergency-reset
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Konveyör hızını güncelle
+POST {{SmartLine.API_HostAddress}}/api/conveyor/speed
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+{
+  "speed": 75
+}
+
+###
+
+### ============================================================
+### SENSORS (SENSÖRLER)
+### ============================================================
+
+### Ortam verisi gönder (normal)
+POST {{SmartLine.API_HostAddress}}/api/sensors/environment
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "temperature": 25.5,
+  "humidity": 60.0
+}
+
+###
+
+### Ortam verisi gönder (yüksek sıcaklık — fan aktif)
+POST {{SmartLine.API_HostAddress}}/api/sensors/environment
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "temperature": 45.0,
+  "humidity": 70.0
+}
+
+###
+
+### Barkod verisi gönder (normal ürün)
+POST {{SmartLine.API_HostAddress}}/api/sensors/barcode
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "barcode": "BC001",
+  "color": "RED"
+}
+
+###
+
+### Barkod verisi gönder (geçerli ikinci ürün)
+POST {{SmartLine.API_HostAddress}}/api/sensors/barcode
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "barcode": "BC002",
+  "color": "BLUE"
+}
+
+###
+
+### Barkod verisi gönder (barkod okunamadı)
+POST {{SmartLine.API_HostAddress}}/api/sensors/barcode
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "barcode": "",
+  "color": null
+}
+
+###
+
+### Yangın algılandı
+POST {{SmartLine.API_HostAddress}}/api/sensors/fire
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "isDetected": true,
+  "deviceEpoch": "0123456789abcdef0123456789abcdef",
+  "fireGeneration": 1
+}
+
+###
+
+### Yangın bitti (normal durum)
+POST {{SmartLine.API_HostAddress}}/api/sensors/fire
+Content-Type: application/json
+Accept: application/json
+X-Device-Key: {{DeviceKey}}
+
+{
+  "isDetected": false,
+  "deviceEpoch": "0123456789abcdef0123456789abcdef",
+  "fireGeneration": 1
+}
+
+###
+
+### Sensör durumunu getir
+GET {{SmartLine.API_HostAddress}}/api/sensors/status
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ============================================================
+### PRODUCTS (ÜRÜNLER)
+### ============================================================
+
+### Tüm ürünleri getir (sayfalı)
+GET {{SmartLine.API_HostAddress}}/api/products?pageNumber=1&pageSize=10
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Hatalı ürünleri getir
+GET {{SmartLine.API_HostAddress}}/api/products/defective?pageNumber=1&pageSize=10
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Barkoda göre ürün getir
+GET {{SmartLine.API_HostAddress}}/api/products/barcode/BC001
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ID'ye göre ürün getir (var olan bir ID ile değiştir)
+GET {{SmartLine.API_HostAddress}}/api/products/1
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ============================================================
+### ALERTS (ALARMLAR)
+### ============================================================
+
+### Tüm alarmları getir (sayfalı)
+GET {{SmartLine.API_HostAddress}}/api/alerts?pageNumber=1&pageSize=10
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Aktif alarmları getir
+GET {{SmartLine.API_HostAddress}}/api/alerts/active
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Alarmı çözümle (var olan bir ID ile değiştir)
+POST {{SmartLine.API_HostAddress}}/api/alerts/1/resolve
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ============================================================
+### STATISTICS (İSTATİSTİKLER)
+### ============================================================
+
+### Günlük istatistikleri getir
+GET {{SmartLine.API_HostAddress}}/api/statistics/daily
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Saatlik istatistikleri getir
+GET {{SmartLine.API_HostAddress}}/api/statistics/hourly
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### ============================================================
+### LOGS (LOGLAR)
+### ============================================================
+
+### Tüm logları getir (sayfalı)
+GET {{SmartLine.API_HostAddress}}/api/logs?pageNumber=1&pageSize=20
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###
+
+### Önem seviyesine göre logları getir (INFO / WARNING / ERROR)
+GET {{SmartLine.API_HostAddress}}/api/logs/severity/WARNING?pageNumber=1&pageSize=20
+Accept: application/json
+Authorization: Bearer {{AccessToken}}
+
+###

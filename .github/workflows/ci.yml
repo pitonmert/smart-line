@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build and integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore solution
+        run: dotnet restore SmartLine.slnx
+
+      - name: Build solution
+        run: dotnet build SmartLine.slnx --configuration Release --no-restore
+
+      - name: Run PostgreSQL integration tests
+        run: >-
+          dotnet test SmartLine.API.Tests/SmartLine.API.Tests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=smartline-api-tests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dashboard:
+    name: Dashboard lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: SmartLine.Dashboard
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: SmartLine.Dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint dashboard
+        run: npm run lint
+
+      - name: Build dashboard
+        run: npm run build
+
+  firmware:
+    name: Firmware PlatformIO builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.1.19
+
+      - name: Prepare non-secret CI firmware configuration
+        run: |
+          cp SmartLine.Firmware/include/Config.h.example SmartLine.Firmware/include/Config.h
+          cp SmartLine.Firmware/include/MqttTlsConfig.h.example SmartLine.Firmware/include/MqttTlsConfig.h
+
+      - name: Build firmware environment
+        run: pio run --project-dir SmartLine.Firmware --environment firmware
+
+      - name: Build sensor-test environment
+        run: pio run --project-dir SmartLine.Firmware --environment sensor-test
+
+  mqtt-security:
+    name: Mosquitto TLS and ACL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      POSTGRES_DB: smartline_ci
+      POSTGRES_USER: smartline_ci
+      POSTGRES_PASSWORD: ci-test-only
+      MQTT_API_PASSWORD: ci-only-api-password-0000000000000000
+      MQTT_FIRMWARE_PASSWORD: ci-only-firmware-password-00000000000
+      MQTT_VISION_PASSWORD: ci-only-vision-password-0000000000000
+      DEVICE_KEY: "dddddddddddddddddddddddddddddddd"
+      JWT_SIGNING_KEY: "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+      BOOTSTRAP_ADMIN_EMAIL: admin@smartline.test
+      BOOTSTRAP_ADMIN_PASSWORD: Ci-Admin-Password-123!
+      CAM_STREAM_URL: http://127.0.0.1:81/stream
+      SMARTLINE_CERT_DIR: /tmp/smartline-mqtt-trusted-certs
+      SMARTLINE_CERT_OUTPUT_DIR: /tmp/smartline-mqtt-trusted-certs
+      SMARTLINE_MQTT_TEST_CERT_DIR: /tmp/smartline-mqtt-test-certs
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate disposable CI certificates
+        env:
+          SMARTLINE_LAN_IP: 127.0.0.1
+        run: sh infra/certs/generate-local-ca.sh
+
+      - name: Generate an untrusted test client certificate
+        run: sh test-support/mqtt/generate-untrusted-client.sh
+
+      - name: Validate MQTT integration compose configuration
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f test-support/mqtt/docker-compose.mtls-test.yml
+          config --quiet
+
+      - name: Start isolated Mosquitto broker
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f test-support/mqtt/docker-compose.mtls-test.yml
+          up --detach --wait --wait-timeout 60 mosquitto
+
+      - name: Verify mutual TLS authentication and topic ACLs
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f test-support/mqtt/docker-compose.mtls-test.yml
+          run --rm --no-deps mqtt-test-client
+
+      - name: Show broker logs after failure
+        if: failure()
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f test-support/mqtt/docker-compose.mtls-test.yml
+          logs mosquitto
+
+      - name: Stop broker
+        if: always()
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f test-support/mqtt/docker-compose.mtls-test.yml
+          down --volumes
+
+      - name: Remove disposable MQTT certificates
+        if: always()
+        run: >-
+          rm -rf
+          /tmp/smartline-mqtt-trusted-certs
+          /tmp/smartline-mqtt-test-certs
+
+  vision:
+    name: Vision Python syntax checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile all Vision Python modules
+        run: python -m compileall -q SmartLine.Vision/src
+
+  secrets:
+    name: Gitleaks full repository scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan the repository and history
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"

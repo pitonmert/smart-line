@@ -1,0 +1,22 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// --- Pin Tanımlamaları ---
+#define COLOR_LED_PIN 26
+#define FLAME_PIN     34
+#define FAN_PIN       27
+#define BUZZER_PIN    25
+#define SERVO_PIN     13
+
+// --- Eşik Değerleri ---
+const float SICAKLIK_SINIRI = 32.0;
+const int   ALEV_SINIRI     = 500;
+
+// --- WiFi & MQTT Bilgileri (Sadece Firmware kullanacak) ---
+static const char* WIFI_SSID      = "YOUR_WIFI_SSID";
+static const char* WIFI_PASS      = "YOUR_WIFI_PASSWORD";
+static const char* MQTT_BROKER    = "YOUR_SMARTLINE_LAN_IP";
+const int          MQTT_PORT      = 8883;
+static const char* MQTT_CLIENT_ID = "smartline-firmware";
+
+#endif

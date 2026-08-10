@@ -1,0 +1,34 @@
+{
+    admin off
+}
+
+https://smartline.local {
+    tls /etc/caddy/certs/smartline.local.crt /etc/caddy/certs/smartline.local.key
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        -Server
+    }
+
+    handle /api/* {
+        reverse_proxy api:5047
+    }
+
+    handle /hubs/* {
+        reverse_proxy api:5047
+    }
+
+    handle /health {
+        reverse_proxy api:5047
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}

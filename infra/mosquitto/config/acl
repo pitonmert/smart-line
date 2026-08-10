@@ -1,0 +1,16 @@
+# The API owns all commands and consumes all device sensor messages.
+user smartline-api
+topic read smartline/sensors/#
+topic write smartline/commands/#
+
+# The firmware publishes environment/fire data and receives actuator commands.
+user smartline-firmware
+topic write smartline/sensors/environment
+topic write smartline/sensors/fire
+topic read smartline/commands/stop
+topic read smartline/commands/speed
+topic read smartline/commands/fan
+
+# Vision only publishes decoded barcode messages.
+user smartline-vision
+topic write smartline/sensors/barcode
