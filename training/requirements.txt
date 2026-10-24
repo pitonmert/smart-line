@@ -1,0 +1,11 @@
+# Cloud training pins for Kaggle, Colab, and RunPod.
+# Checked against PyPI on 2026-10-06.
+# ultralytics 8.4.173 ships the YOLO26 family (yolo26n, yolo26n-cls, yolo26n-seg).
+# Local industrial inference does not install this file. The Intel CPU target uses
+# the optional ONNX Runtime / OpenVINO adapters in SmartLine.Vision.
+ultralytics==8.4.173
+pyyaml==6.0.2
+onnx==1.17.0
+onnxruntime==1.22.1
+openvino==2026.4.1
+Pillow==12.3.0

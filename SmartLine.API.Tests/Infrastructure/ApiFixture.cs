@@ -1,3 +1,5 @@
+using SmartLine.API.Features.Inspection;
+
 namespace SmartLine.API.Tests.Infrastructure;
 
 public sealed class ApiFixture : IAsyncLifetime
@@ -89,6 +91,7 @@ public sealed class ApiFixture : IAsyncLifetime
             await db.Database.EnsureDeletedAsync();
             await db.Database.MigrateAsync();
             await SeedRolesAsync(scope.ServiceProvider);
+            scope.ServiceProvider.GetService<ScriptedVisionFrames>()?.Reset();
             Mqtt.Reset();
         }
         finally
@@ -220,6 +223,13 @@ public sealed class ApiFixture : IAsyncLifetime
                 "/tmp/integration-test-client.crt"
             );
             builder.UseSetting("Mqtt:ClientKeyPath", "/tmp/integration-test-client.key");
+            builder.UseSetting("Simulation:Enabled", "true");
+            builder.UseSetting("Sorting:HardwareActuationEnabled", "false");
+            builder.UseSetting("Vision:HealthUrl", "");
+            builder.UseSetting(
+                "Dataset:Root",
+                Path.Combine(Path.GetTempPath(), "smartline-api-tests", "datasets")
+            );
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<ApplicationDbContext>();
@@ -246,6 +256,11 @@ public sealed class ApiFixture : IAsyncLifetime
                 services.AddSingleton<RecordingMqttService>();
                 services.AddSingleton<IMqttService>(provider =>
                     provider.GetRequiredService<RecordingMqttService>()
+                );
+                services.RemoveAll<IVisionFrames>();
+                services.AddSingleton<ScriptedVisionFrames>();
+                services.AddSingleton<IVisionFrames>(provider =>
+                    provider.GetRequiredService<ScriptedVisionFrames>()
                 );
             });
         }

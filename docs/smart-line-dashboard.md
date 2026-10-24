@@ -1,6 +1,8 @@
 # SmartLine.Dashboard teknik referansı
 
-SmartLine.Dashboard, React 19, TypeScript, Vite ve Tailwind tabanlı aynı-origin SPA'dır. İlk durumu REST ile alır, sonraki ürün/konveyör/ortam/alarm/log değişikliklerini SignalR üzerinden uygular.
+SmartLine.Dashboard, React 19, TypeScript, Vite ve Tailwind tabanlı aynı-origin kontrol merkezidir. Sayfalar history API ile değişir: Control Room, AI Inspection, Production Analytics, Sensors, Sorting, Product Recipes, Calibration, Dataset & AI, Inspection History, System Diagnostics.
+
+Kamera paneli MJPEG görüntüsünü `object-fit: contain` ile doldurur. Çözünürlük artırılmaz. Bounding box koordinatları kaynak pikseldedir. Canvas, görüntünün letterbox ölçeği ve boşluk payıyla aynı dönüşümü kullanır. Overlay son inspection'a aittir; her akan kareye kilitli değildir. SIMULATION sonuçları rozetle gösterilir. Acil durdurma mevcut onaylı kontrol olarak kalır. Gerçek servo komutu bu arayüzden gönderilmez.
 
 ## Kaynak yapısı
 
@@ -133,11 +135,18 @@ Dashboard tarayıcıdan `http://localhost:5173` açılır; `/api` ve `/hubs` Vit
 cd SmartLine.Dashboard
 npm run lint
 npm run build
+npm run e2e
 ```
+
+`npm run e2e` Playwright ile production preview üzerinde login, on ana sayfa, kamera paneli, simülasyon bandı ve dataset yakalama düğmesini route mock'larıyla doğrular. Üretim kimlik doğrulaması gevşetilmez. Trace ve ekran görüntüleri üretilen dosyalardır.
 
 Production static build, `infra/caddy/Dockerfile` içindeki Node build stage'inde oluşturulur. Caddy `https://smartline.local` üzerinden static dosyaları sunar ve `/api`, `/hubs`, `/health` yollarını API container'ına proxy eder. Browser ile API aynı origin'dedir.
 
 Production kurulumu ve yerel CA trust adımları için [deployment.md](deployment.md) kullanılır.
+
+## Dataset toplama
+
+Dataset & AI sayfası canlı MJPEG önizlemeyi gösterir ve `Capture from camera` ile sunucudan bir JPEG ister. Tarayıcı, cross-origin MJPEG öğesinin piksellerini okumaz. API, Vision `GET /frames/dataset` karesini tek dosya olarak dataset oturumuna yazar. Ürün sınıfı, renk, boyut ve kusur seçenekleri aktif Product Recipe listelerinden gelir. Kalite `GOOD` veya `DEFECTIVE` olur. Aralık yakalama aynı kamera uç noktasını, ekrandaki güncel etiketlerle çağırır. Küçük resimler access token bellekte olduğu için `Authorization` başlığıyla alınır ve blob URL olarak gösterilir. Diskten JPEG/PNG seçmek ikincil içe aktarmadır. Ham görüntüler Git'e girmez.
 
 ## Sınırlar
 

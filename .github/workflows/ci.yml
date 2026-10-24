@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "integration/**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,6 +26,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Set up Python for API–Vision integration
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Restore solution
         run: dotnet restore SmartLine.slnx
@@ -50,9 +56,9 @@ jobs:
           retention-days: 7
 
   dashboard:
-    name: Dashboard lint and build
+    name: Dashboard lint, build, and browser tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: SmartLine.Dashboard
@@ -73,8 +79,17 @@ jobs:
       - name: Lint dashboard
         run: npm run lint
 
+      - name: Test dashboard overlay geometry
+        run: npm test
+
       - name: Build dashboard
         run: npm run build
+
+      - name: Install the Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser end-to-end tests
+        run: npm run e2e
 
   firmware:
     name: Firmware PlatformIO builds
@@ -103,6 +118,15 @@ jobs:
 
       - name: Build sensor-test environment
         run: pio run --project-dir SmartLine.Firmware --environment sensor-test
+
+      - name: Build ESP32-CAM environment
+        env:
+          WIFI_SSID: YOUR_WIFI_SSID
+          WIFI_PASS: YOUR_WIFI_PASSWORD
+          WIFI_STATIC_IP: 192.168.1.50
+          WIFI_GATEWAY: 192.168.1.1
+          WIFI_SUBNET: 255.255.255.0
+        run: pio run --project-dir SmartLine.Cam --environment esp32cam
 
   mqtt-security:
     name: Mosquitto TLS and ACL integration
@@ -192,8 +216,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile all Vision Python modules
-        run: python -m compileall -q SmartLine.Vision/src
+      - name: Install image test dependencies
+        run: python -m pip install numpy Pillow==12.3.0
+
+      - name: Compile Vision, camera smoke, and training modules
+        run: python -m compileall -q SmartLine.Vision/src SmartLine.Cam/scripts SmartLine.Cam/tests training
+
+      - name: Run Vision, camera smoke, and training unit tests
+        run: |
+          python -m unittest discover -s SmartLine.Vision/tests -p 'test_*.py'
+          python -m unittest discover -s SmartLine.Cam/tests -p 'test_*.py'
+          python -m unittest discover -s training/tests -p 'test_*.py'
 
   secrets:
     name: Gitleaks full repository scan

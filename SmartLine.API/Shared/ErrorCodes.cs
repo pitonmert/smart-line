@@ -18,4 +18,9 @@ public static class ErrorCodes
     public const string MqttUnavailable = "MQTT_UNAVAILABLE";
     public const string DatabaseConflict = "DATABASE_CONFLICT";
     public const string UnexpectedError = "UNEXPECTED_ERROR";
+    public const string RecipeInvalid = "RECIPE_INVALID";
+    public const string CalibrationInvalid = "CALIBRATION_INVALID";
+    public const string SimulationDisabled = "SIMULATION_DISABLED";
+    public const string TrackingTransitionInvalid = "TRACKING_TRANSITION_INVALID";
+    public const string DatasetInvalid = "DATASET_INVALID";
 }

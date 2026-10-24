@@ -27,7 +27,10 @@ Vite proxy ayarları process environment üzerinden okunur:
 ## Verification
 
 ```bash
+npm test
 npm run lint
 npm run build
 npm audit --omit=dev
 ```
+
+`npm test` checks the camera overlay geometry and diagnostic status colors. The control center pages are Control Room, AI Inspection, Production Analytics, Sensors, Sorting, Product Recipes, Calibration, Dataset & AI, Inspection History, and System Diagnostics. The live MJPEG image uses `object-fit: contain`. Inspection boxes are drawn on a canvas from source pixels, using the same letterbox scale as the image. Dataset capture asks the API for the vision dataset frame. The page does not read pixels from the preview image. Simulated values stay labeled SIMULATION.

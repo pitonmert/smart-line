@@ -43,7 +43,7 @@ export default function GaugeBase({ value, min, max, unit, label, thresholds, de
   return (
     <div className="flex flex-col items-center">
       <svg viewBox="0 0 100 80" className="w-full max-w-[180px]">
-        <path d={arcPath(-135, 135, r)} fill="none" stroke="#e2e8f0" strokeWidth="6" strokeLinecap="round" />
+        <path d={arcPath(-135, 135, r)} fill="none" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
         {ratio > 0.005 && (
           <path d={arcPath(startAngle, endAngle, r)} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" />
         )}

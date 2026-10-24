@@ -25,6 +25,11 @@ install -m 0444 -o "$runtime_user" -g "$runtime_group" \
 install -m 0400 -o "$runtime_user" -g "$runtime_group" \
     "$source_dir/smartline-api.key" "$target_dir/smartline-api.key"
 
+# Dataset images must stay writable when the API source tree is mounted
+# read-only. Compose points Dataset__Root at this directory.
+dataset_dir=${Dataset__Root:-/var/lib/smartline/datasets}
+install -d -m 0750 -o "$runtime_user" -g "$runtime_group" "$dataset_dir"
+
 # Development-only named volumes start as root-owned. The directories are
 # absent from the production image, so this has no production-side effect.
 for writable_dir in /home/app/.nuget/packages /src/bin /src/obj; do

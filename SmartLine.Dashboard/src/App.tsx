@@ -4,17 +4,25 @@ import { useSignalR } from './hooks/useSignalR'
 import { useDashboard } from './hooks/useDashboard'
 import { useAlertSound } from './hooks/useAlertSound'
 import Layout from './components/layout/Layout'
-import ConveyorCard from './components/conveyor/ConveyorCard'
-import EnvironmentPanel from './components/gauges/EnvironmentPanel'
-import ProductionAndProducts from './components/charts/ProductionAndProducts'
+import SideNav from './components/layout/SideNav'
 import FireAlarmOverlay from './components/alerts/FireAlarmOverlay'
 import AlertsToggle from './components/alerts/AlertsToggle'
 import AlertsPanel from './components/alerts/AlertsPanel'
-import LiveLogFeed from './components/activity/LiveLogFeed'
 import SimulatorToggle from './components/simulator/SimulatorToggle'
 import SimulatorPanel from './components/simulator/SimulatorPanel'
 import LoginPage from './components/auth/LoginPage'
 import { AuthProvider, useAuth } from './auth/AuthContext'
+import { useRoute } from './navigation/useRoute'
+import ControlRoom from './pages/ControlRoom'
+import InspectionPage from './pages/InspectionPage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import SensorsPage from './pages/SensorsPage'
+import SortingPage from './pages/SortingPage'
+import RecipesPage from './pages/RecipesPage'
+import CalibrationPage from './pages/CalibrationPage'
+import DatasetPage from './pages/DatasetPage'
+import HistoryPage from './pages/HistoryPage'
+import DiagnosticsPage from './pages/DiagnosticsPage'
 
 function Dashboard() {
   useSignalR()
@@ -24,9 +32,14 @@ function Dashboard() {
   const { hasMinimumRole } = useAuth()
   const [openPanel, setOpenPanel] = useState<'simulator' | 'alerts' | null>(null)
   const simulatorEnabled = import.meta.env.DEV && hasMinimumRole('Operator')
+  const { path, navigate } = useRoute()
+  const navigation = <SideNav path={path} onNavigate={navigate} />
+  const mobileNavigation = <SideNav compact path={path} onNavigate={navigate} />
 
   return (
     <Layout
+      nav={navigation}
+      mobileNav={mobileNavigation}
       headerExtra={
         <>
           <AlertsToggle
@@ -64,23 +77,22 @@ function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
-        {/* Ust sira: Konveyor dar, Ortam 2 sutun */}
-        <ConveyorCard />
-        <div className="lg:col-span-2">
-          <EnvironmentPanel />
+      {path === '/' && <ControlRoom />}
+      {path === '/inspection' && <InspectionPage />}
+      {path === '/analytics' && <AnalyticsPage />}
+      {path === '/sensors' && <SensorsPage />}
+      {path === '/sorting' && <SortingPage />}
+      {path === '/recipes' && <RecipesPage />}
+      {path === '/calibration' && <CalibrationPage />}
+      {path === '/dataset' && <DatasetPage />}
+      {path === '/history' && <HistoryPage />}
+      {path === '/diagnostics' && <DiagnosticsPage />}
+      {path === null && (
+        <div className="rounded-xl border border-card-border bg-card p-6">
+          <p className="text-sm">This address is not a control-center page.</p>
+          <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-white" onClick={() => navigate('/')}>Control Room</button>
         </div>
-
-        {/* Birlesik uretim + son urunler — tam genislik */}
-        <div className="md:col-span-2 lg:col-span-3">
-          <ProductionAndProducts />
-        </div>
-
-        {/* Log akisi — tam genislik */}
-        <div className="md:col-span-2 lg:col-span-3">
-          <LiveLogFeed />
-        </div>
-      </div>
+      )}
     </Layout>
   )
 }

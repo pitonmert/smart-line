@@ -66,7 +66,12 @@ services:
       BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL}
       BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD}
       ReverseProxy__KnownProxy: 172.30.0.10
+      Vision__HealthUrl: http://vision:8090/health
+      Vision__ServiceKey: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
+      Vision__CaptureTimeoutSeconds: ${VISION_CAPTURE_TIMEOUT_SECONDS:-35}
+      Dataset__Root: /var/lib/smartline/datasets
     volumes:
+      - api_datasets:/var/lib/smartline/datasets
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.crt:/run/smartline/cert-source/smartline-api.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.key:/run/smartline/cert-source/smartline-api.key:ro
@@ -100,9 +105,19 @@ services:
       MQTT_CLIENT_CERT_PATH: /run/smartline/certs/smartline-vision.crt
       MQTT_CLIENT_KEY_PATH: /run/smartline/certs/smartline-vision.key
       CAM_STREAM_URL: ${CAM_STREAM_URL}
+      CAM_CAPTURE_URL: ${CAM_CAPTURE_URL:-}
+      VISION_CONTROL_HOST: 0.0.0.0
+      VISION_SERVICE_KEY: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
+      STILL_CAPTURE_TIMEOUT: ${STILL_CAPTURE_TIMEOUT:-30}
+      MODEL_PATH: ${MODEL_PATH:-}
+      MODEL_VERSION: ${MODEL_VERSION:-}
+      API_BASE_URL: http://api:5047
+      DEVICE_KEY: ${DEVICE_KEY}
+      ALLOW_PREVIEW_FALLBACK: "false"
       LOG_LEVEL: INFO
       SHOW_PREVIEW: "false"
     volumes:
+      - ./models/runtime:/opt/smartline/models:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-vision.crt:/run/smartline/cert-source/smartline-vision.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-vision.key:/run/smartline/cert-source/smartline-vision.key:ro
@@ -110,6 +125,8 @@ services:
       - /run/smartline/certs:size=1m,mode=0700
     depends_on:
       mosquitto:
+        condition: service_healthy
+      api:
         condition: service_healthy
     restart: unless-stopped
     networks: [backend]
@@ -135,6 +152,7 @@ services:
 volumes:
   postgres_data:
   mosquitto_data:
+  api_datasets:
 
 networks:
   backend:

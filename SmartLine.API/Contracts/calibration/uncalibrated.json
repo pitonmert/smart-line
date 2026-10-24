@@ -1,0 +1,29 @@
+{
+  "cameraRoi": null,
+  "inspectionZone": null,
+  "perspectiveReference": null,
+  "pixelsPerMillimeter": null,
+  "orientationDegrees": 0,
+  "flipHorizontal": false,
+  "flipVertical": false,
+  "colorReference": null,
+  "beltSpeedMmPerSecond": null,
+  "inspectionToSorterDistanceMm": null,
+  "gateMappings": [
+    { "binCode": "BIN_A", "servoDegrees": 0, "enabled": false },
+    { "binCode": "BIN_B", "servoDegrees": 0, "enabled": false },
+    { "binCode": "BIN_C", "servoDegrees": 0, "enabled": false },
+    { "binCode": "REJECT_BIN", "servoDegrees": 0, "enabled": false },
+    { "binCode": "MANUAL_REVIEW", "servoDegrees": 0, "enabled": false }
+  ],
+  "tofBaseline": {
+    "source": "NOT_INTEGRATED",
+    "productPresent": null,
+    "distanceMm": null,
+    "triggerTimestamp": null,
+    "sensorHealthy": null
+  },
+  "hardwareActuationEnabled": false,
+  "hardwareActuationConfirmed": false,
+  "notes": "Placeholder profile. Pixel-to-millimetre, belt speed, and sorter distance are unknown until an operator calibrates them. Servo outputs stay disabled. VL53L1X readings are not available."
+}

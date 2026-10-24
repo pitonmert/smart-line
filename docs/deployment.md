@@ -149,10 +149,11 @@ docker compose --env-file .env -f docker-compose.dev.yml up --build
 
 Development MQTT de aynı TLS/ACL sözleşmesini kullanır. Vite `SMARTLINE_DEVICE_KEY` değerini yalnız server-side proxy process'inde okuyup sensor çağrılarına `X-Device-Key` ekler; değer frontend bundle'a yazılmaz. Browser `/api` ve `/hubs` yollarını aynı dev origin'den kullanır, CORS yoktur.
 
-Vision development'ta opsiyonel profildir:
+Vision development'ta opsiyonel profildir. Profil tek başına süreci başlatır; API health adresi boş kaldığı için tanı `NOT_CONFIGURED` kalır. PostgreSQL, MQTT, API, Dashboard ve Vision'ı adres yazmadan birlikte açmak için development overlay kullanılır. Overlay host'a `8090` yayınlar. Production bu portu yayınlamaz ve API'ye yalnız iç adres `http://vision:8090/health` verir.
 
 ```bash
 docker compose --env-file .env -f docker-compose.dev.yml --profile vision up --build
+docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.vision.yml --profile vision up --build
 ```
 
 ## 8. CI ve release doğrulaması
@@ -186,3 +187,21 @@ Rotation teyidi ve arşiv parolası olmadan bu adımlar otomatik uygulanmaz. Git
 - Refresh token, MQTT credential ve DeviceKey rotation prosedürleri ayrı işletilmelidir.
 - Backup/restore, PostgreSQL retention ve log rotation deployment sahibinin operasyon sorumluluğudur.
 - Ayrıntılı API ve safety sözleşmesi için [smart-line-api.md](smart-line-api.md) ve [smart-line-firmware.md](smart-line-firmware.md) kullanılır.
+
+
+## v0.2.0 dataset and model operations
+
+Back up PostgreSQL and dataset files together. Pause the API writer while copying, and restart it even if a backup step fails. Do not use a host `datasets/` directory as a substitute for the Compose named volume.
+
+```sh
+mkdir -p backup
+# Run during a maintenance window; these commands are documentation only.
+docker compose stop api
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup/database.sql
+docker compose cp api:/var/lib/smartline/datasets backup/datasets
+docker compose start api
+```
+
+Use a copied session's `manifest.jsonl` and `images/` as the training tool inputs. Retain the matching database backup for restoration. Dataset startup reconciliation reports missing accepted images rather than silently treating them as valid.
+
+Place reviewed artifacts and their export sidecars in `models/runtime`, mounted read-only at `/opt/smartline/models`. Configure `MODEL_PATH` with the container path and `MODEL_VERSION` matching the sidecar and recipe. Restart Vision after replacement. Configure `CAM_CAPTURE_URL` when capture/status are not on camera port 80. Keep `STILL_CAPTURE_TIMEOUT` below `VISION_CAPTURE_TIMEOUT_SECONDS`; the defaults are 30 and 35 seconds. No real model acceptance or physical camera verification was performed during integration.

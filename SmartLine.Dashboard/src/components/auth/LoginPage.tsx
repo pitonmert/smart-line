@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen grid place-items-center bg-surface p-4">
-      <section className="w-full max-w-sm rounded-2xl border border-card-border bg-card p-7 shadow-xl shadow-slate-200/60">
+      <section className="w-full max-w-sm rounded-2xl border border-card-border bg-card p-7 shadow-xl shadow-black/40">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary-light">
             <FaCog className="text-2xl" />

@@ -7,6 +7,21 @@ import type {
   DashboardDto,
   StatisticsDto,
 } from '../types'
+import type {
+  CalibrationDefinition,
+  CalibrationProfile,
+  CompletedInspection,
+  ControlRoom,
+  DatasetCaptureResult,
+  DatasetSession,
+  DiagnosticsReport,
+  InspectionResult,
+  Paged,
+  ProductTrack,
+  RecipeSummary,
+  ReleaseResult,
+  SimulationStatus,
+} from '../types/inspection'
 
 const BASE = '/api'
 const EXPIRY_SKEW_MS = 30_000
@@ -177,6 +192,88 @@ export const api = {
 
   sendBarcodeData: (barcode: string, color?: string) =>
     request<string>('POST', '/sensors/barcode', { barcode, color }),
+
+  getControlRoom: () => request<ControlRoom>('GET', '/control-room'),
+  getDiagnostics: () => request<DiagnosticsReport>('GET', '/diagnostics'),
+  getRecipes: () => request<RecipeSummary[]>('GET', '/recipes'),
+  activateRecipe: (id: string) => request<RecipeSummary>('POST', `/recipes/${id}/activate`),
+  getCalibrationProfiles: () => request<CalibrationProfile[]>('GET', '/calibration-profiles'),
+  createCalibrationProfile: (body: { name: string; description: string; definition: CalibrationDefinition }) =>
+    request<CalibrationProfile>('POST', '/calibration-profiles', body),
+  activateCalibrationProfile: (id: string) => request<CalibrationProfile>('POST', `/calibration-profiles/${id}/activate`),
+  getInspections: (query: string) => request<Paged<InspectionResult>>('GET', `/inspections${query}`),
+  inspectVision: (requestId: string) => request<CompletedInspection>('POST', '/inspections/vision', { requestId }),
+  async readCameraPreview() {
+    const load = async (accessToken?: string) => fetch(`${BASE}/camera/preview`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, credentials: 'include' })
+    let response = await load(session?.accessToken)
+    if (response.status === 401) { const refreshed = await refreshSession(); if (refreshed) response = await load(refreshed.accessToken) }
+    if (!response.ok) throw new ApiError('Camera preview unavailable.', 'VISION_UNAVAILABLE', response.status)
+    return response.blob()
+  },
+  submitInspection: (body: Record<string, unknown>) => request<CompletedInspection>('POST', '/inspections', body),
+  getSortQueue: () => request<ProductTrack[]>('GET', '/tracking/queue'),
+  releaseTrack: (id: string) => request<ReleaseResult>('POST', `/tracking/${id}/release`),
+  getSimulationStatus: () => request<SimulationStatus>('GET', '/simulation/status'),
+  simulateArrival: (body: Record<string, unknown>) => request<CompletedInspection>('POST', '/simulation/arrivals', body),
+  tickSimulation: (utcNow: string) => request<{ sortedCount: number; actuation: ReleaseResult['actuation'] }>('POST', '/simulation/tick', { utcNow }),
+  getDatasetSessions: () => request<DatasetSession[]>('GET', '/dataset/sessions'),
+  startDatasetSession: (body: Record<string, unknown>) => request<DatasetSession>('POST', '/dataset/sessions', body),
+  stopDatasetSession: (id: string) => request<DatasetSession>('POST', `/dataset/sessions/${id}/stop`),
+  captureDatasetFromCamera: (id: string, body: {
+    productClass: string
+    qualityLabel: string
+    colorLabel: string
+    sizeLabel: string
+    defectLabels: string[]
+    notes: string
+  }) => request<DatasetCaptureResult>('POST', `/dataset/sessions/${id}/captures/camera`, body),
+  rejectDatasetSample: (id: string, sampleId: string) => request<DatasetSession>('DELETE', `/dataset/sessions/${id}/samples/${sampleId}`),
+
+  async readDatasetImage(sessionId: string, fileName: string) {
+    const load = async (accessToken?: string) => {
+      const headers = new Headers()
+      if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+      return fetch(`${BASE}/dataset/sessions/${sessionId}/images/${encodeURIComponent(fileName)}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      })
+    }
+
+    let response = await load(session?.accessToken)
+    if (response.status === 401) {
+      const refreshed = await refreshSession()
+      if (refreshed) response = await load(refreshed.accessToken)
+    }
+    if (!response.ok) {
+      throw new ApiError('Dataset image was not found.', 'RESOURCE_NOT_FOUND', response.status)
+    }
+    return response.blob()
+  },
+
+  async captureDatasetImage(sessionId: string, file: File) {
+    const sendFile = async (accessToken?: string) => {
+      const headers = new Headers()
+      if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+      return fetch(`${BASE}/dataset/sessions/${sessionId}/captures`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: (() => {
+          const form = new FormData()
+          form.append('image', file)
+          return form
+        })(),
+      })
+    }
+
+    let response = await sendFile(session?.accessToken)
+    if (response.status === 401) {
+      const refreshed = await refreshSession()
+      if (refreshed) response = await sendFile(refreshed.accessToken)
+    }
+    return unwrap(response, await parseResponse<DatasetSession>(response))
+  },
 }
 
 const errorMessages: Record<string, string> = {

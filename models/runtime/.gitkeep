@@ -1,0 +1,2 @@
+# Runtime weights stay in this directory and are ignored by Git.
+# Place a reviewed ONNX, OpenVINO, or PyTorch artifact here after cloud training.

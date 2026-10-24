@@ -1,0 +1,20 @@
+# Development overlay. Pair it with docker-compose.dev.yml and --profile vision.
+# It does not belong on the production command. Production reaches Vision on the
+# internal network and does not publish port 8090.
+
+services:
+  api:
+    environment:
+      Vision__HealthUrl: http://vision:8090/health
+
+  vision:
+    environment:
+      RECIPE_PATH: /opt/smartline/recipe/demobox.json
+      MODEL_PATH: ${MODEL_PATH:-}
+      MODEL_CONFIDENCE: "0.25"
+      ALLOW_PREVIEW_FALLBACK: "false"
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ./SmartLine.API/Contracts/recipes/demobox.json:/opt/smartline/recipe/demobox.json:ro
+      - ./models/runtime:/opt/smartline/models:ro

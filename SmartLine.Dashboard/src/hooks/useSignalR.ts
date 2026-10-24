@@ -50,6 +50,12 @@ export function useSignalR() {
     connection.on('ReceiveLogUpdate', (log: LogDto) =>
       dispatch({ type: 'ADD_LOG', payload: log }))
 
+    connection.on('ReceiveInspectionUpdate', (inspection: unknown) =>
+      window.dispatchEvent(new CustomEvent('smartline-inspection', { detail: inspection })))
+
+    connection.on('ReceiveTrackingUpdate', (track: unknown) =>
+      window.dispatchEvent(new CustomEvent('smartline-tracking', { detail: track })))
+
     connection.start()
       .then(() => dispatch({ type: 'SET_CONNECTION', payload: 'connected' }))
       .catch((err) => {

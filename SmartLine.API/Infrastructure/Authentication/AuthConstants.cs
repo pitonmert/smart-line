@@ -16,6 +16,7 @@ public static class AuthPolicies
     public const string Operator = "Operator";
     public const string Admin = "Admin";
     public const string Device = "Device";
+    public const string OperatorOrDevice = "OperatorOrDevice";
 }
 
 public static class DeviceKeyDefaults

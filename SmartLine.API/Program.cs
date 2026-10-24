@@ -16,6 +16,7 @@ using Serilog;
 using SmartLine.API.Domain.Identity;
 using SmartLine.API.Features.Auth;
 using SmartLine.API.Features.Conveyor;
+using SmartLine.API.Features.Inspection;
 using SmartLine.API.Features.Monitoring;
 using SmartLine.API.Features.Production;
 using SmartLine.API.Features.Safety;
@@ -241,6 +242,17 @@ builder
                 .AddAuthenticationSchemes(DeviceKeyDefaults.Scheme)
                 .RequireAuthenticatedUser()
                 .RequireRole(AuthRoles.Device)
+    )
+    .AddPolicy(
+        AuthPolicies.OperatorOrDevice,
+        policy =>
+            policy
+                .AddAuthenticationSchemes(
+                    JwtBearerDefaults.AuthenticationScheme,
+                    DeviceKeyDefaults.Scheme
+                )
+                .RequireAuthenticatedUser()
+                .RequireRole(AuthRoles.Operator, AuthRoles.Admin, AuthRoles.Device)
     );
 
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, EnvelopeAuthorizationMiddlewareResultHandler>();
@@ -258,6 +270,36 @@ builder.Services.AddScoped<EnvironmentHandler>();
 builder.Services.AddScoped<FireHandler>();
 builder.Services.AddScoped<StatisticsHandler>();
 builder.Services.AddScoped<DashboardHandler>();
+builder.Services.AddScoped<InspectionWorkflow>();
+builder.Services.AddScoped<DatasetStore>();
+builder.Services.AddSingleton<SimulationLatch>();
+builder.Services.AddHttpClient(
+    "vision-health",
+    client => client.Timeout = TimeSpan.FromMilliseconds(800)
+);
+builder.Services.AddHttpClient(
+    "vision-capture",
+    client => { client.Timeout = TimeSpan.FromSeconds(Math.Clamp(builder.Configuration.GetValue<int?>("Vision:CaptureTimeoutSeconds") ?? 35, 5, 120)); client.MaxResponseContentBufferSize = 1_000_000; }
+);
+builder.Services.AddSingleton<IVisionFrames, HttpVisionFrames>();
+builder.Services.AddSingleton<IVisionProbe, HttpVisionProbe>();
+builder
+    .Services.AddOptions<SortingOptions>()
+    .Bind(builder.Configuration.GetSection(SortingOptions.SectionName));
+builder
+    .Services.AddOptions<SimulationOptions>()
+    .Bind(builder.Configuration.GetSection(SimulationOptions.SectionName));
+builder
+    .Services.AddOptions<VisionEndpointOptions>()
+    .Bind(builder.Configuration.GetSection(VisionEndpointOptions.SectionName));
+builder
+    .Services.AddOptions<DatasetOptions>()
+    .Bind(builder.Configuration.GetSection(DatasetOptions.SectionName))
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.Root),
+        "Dataset:Root must be configured."
+    )
+    .ValidateOnStart();
 
 builder.Services.AddSingleton<IMqttService, MqttService>();
 builder.Services.AddSingleton<MqttDesiredStatePublisher>();
@@ -333,6 +375,10 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
+    await ContractSeeder.EnsureAsync(db);
+    try { await scope.ServiceProvider.GetRequiredService<DatasetStore>().RecoverAsync(CancellationToken.None); }
+    catch (ApiException error) when (error.StatusCode == 503)
+    { app.Logger.LogError(error, "Dataset recovery is unavailable; other API services remain enabled."); }
 }
 await IdentityBootstrapper.InitializeAsync(app.Services, app.Environment);
 
@@ -394,6 +440,8 @@ app.MapStatisticsEndpoints();
 app.MapBarcodeEndpoint();
 app.MapSensorSafetyEndpoints();
 app.MapDashboardEndpoint();
+app.MapInspectionPlatform();
+app.MapVisionInspection();
 app.MapHub<DashboardHub>("/hubs/dashboard").RequireAuthorization(AuthPolicies.Viewer);
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapFallback(() =>

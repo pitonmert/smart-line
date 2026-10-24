@@ -1,0 +1,421 @@
+{
+  "recipe": "demobox",
+  "cases": [
+    {
+      "name": "good red large goes to bin a",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [],
+        "confidence": 0.93
+      },
+      "expected": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [],
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_A",
+        "ruleId": "red-large"
+      },
+      "expectedReasons": [
+        "RULE:red-large"
+      ]
+    },
+    {
+      "name": "good blue medium goes to bin b",
+      "observation": {
+        "productClass": "BOX_BLUE",
+        "colorClass": "BLUE",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [],
+        "confidence": 0.88
+      },
+      "expected": {
+        "productClass": "BOX_BLUE",
+        "colorClass": "BLUE",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [],
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_B",
+        "ruleId": "blue-medium"
+      },
+      "expectedReasons": [
+        "RULE:blue-medium"
+      ]
+    },
+    {
+      "name": "good green box goes to bin c",
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "SMALL",
+        "defectClasses": [],
+        "confidence": 0.81
+      },
+      "expected": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "SMALL",
+        "defectClasses": [],
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_C",
+        "ruleId": "green-good"
+      },
+      "expectedReasons": [
+        "RULE:green-good"
+      ]
+    },
+    {
+      "name": "any defect rejects",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [
+          "DAMAGED"
+        ],
+        "confidence": 0.99
+      },
+      "expected": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [
+          "DAMAGED"
+        ],
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN",
+        "ruleId": "any-defect"
+      },
+      "expectedReasons": [
+        "DEFECTS_PRESENT"
+      ]
+    },
+    {
+      "name": "low confidence without a defect is held",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [],
+        "confidence": 0.2
+      },
+      "expected": {
+        "qualityStatus": "MANUAL_REVIEW",
+        "decision": "MANUAL_REVIEW",
+        "destinationBin": "MANUAL_REVIEW",
+        "ruleId": null
+      },
+      "expectedReasons": [
+        "LOW_CONFIDENCE"
+      ]
+    },
+    {
+      "name": "a defect overrides low confidence",
+      "observation": {
+        "productClass": "BOX_BLUE",
+        "colorClass": "BLUE",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [
+          "MISSING_LABEL"
+        ],
+        "confidence": 0.1
+      },
+      "expected": {
+        "defectClasses": [
+          "MISSING_LABEL"
+        ],
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN",
+        "ruleId": "any-defect"
+      },
+      "expectedReasons": [
+        "DEFECTS_PRESENT"
+      ]
+    },
+    {
+      "name": "unknown class is rejected",
+      "observation": {
+        "productClass": "MYSTERY",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "defectClasses": [],
+        "confidence": 0.95
+      },
+      "expected": {
+        "productClass": "UNKNOWN",
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN",
+        "ruleId": "any-defect"
+      },
+      "expectedReasons": [
+        "UNKNOWN_CLASS"
+      ]
+    },
+    {
+      "name": "measured color that disagrees with the class is a defect",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "BLUE",
+        "sizeClass": "LARGE",
+        "defectClasses": [],
+        "confidence": 0.9
+      },
+      "expected": {
+        "productClass": "BOX_RED",
+        "colorClass": "BLUE",
+        "defectClasses": [
+          "WRONG_COLOR"
+        ],
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN",
+        "ruleId": "any-defect"
+      },
+      "expectedReasons": [
+        "COLOR_MISMATCH"
+      ]
+    },
+    {
+      "name": "visual width assigns large",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "estimatedWidthMm": 120,
+        "defectClasses": [],
+        "confidence": 0.9
+      },
+      "expected": {
+        "sizeClass": "LARGE",
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_A",
+        "ruleId": "red-large"
+      },
+      "expectedReasons": [
+        "SIZE_FROM_VISUAL_WIDTH"
+      ]
+    },
+    {
+      "name": "visual width assigns small and does not use the red-large rule",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "LARGE",
+        "estimatedWidthMm": 10,
+        "defectClasses": [],
+        "confidence": 0.9
+      },
+      "expected": {
+        "sizeClass": "SMALL",
+        "qualityStatus": "GOOD",
+        "decision": "MANUAL_REVIEW",
+        "destinationBin": "MANUAL_REVIEW",
+        "ruleId": null
+      },
+      "expectedReasons": [
+        "SIZE_FROM_VISUAL_WIDTH",
+        "DEFAULT_DESTINATION"
+      ]
+    },
+    {
+      "name": "width outside every size class is wrong size",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "estimatedWidthMm": 500,
+        "defectClasses": [],
+        "confidence": 0.9
+      },
+      "expected": {
+        "sizeClass": "UNKNOWN",
+        "defectClasses": [
+          "WRONG_SIZE"
+        ],
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN",
+        "ruleId": "any-defect"
+      },
+      "expectedReasons": [
+        "SIZE_OUT_OF_RANGE"
+      ]
+    },
+    {
+      "name": "exact confidence threshold is accepted",
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [],
+        "confidence": 0.6
+      },
+      "expected": {
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_C",
+        "ruleId": "green-good"
+      },
+      "expectedReasons": [
+        "RULE:green-good"
+      ]
+    },
+    {
+      "name": "simulation flag does not change the bin",
+      "observation": {
+        "productClass": "BOX_BLUE",
+        "colorClass": "BLUE",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [],
+        "confidence": 0.77,
+        "simulation": true
+      },
+      "expected": {
+        "decision": "PASS",
+        "destinationBin": "BIN_B",
+        "ruleId": "blue-medium",
+        "simulation": true
+      },
+      "expectedReasons": [
+        "RULE:blue-medium"
+      ]
+    },
+    {
+      "name": "defect codes are returned in recipe order",
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "SMALL",
+        "defectClasses": [
+          "WRONG_ORIENTATION",
+          "DAMAGED"
+        ],
+        "confidence": 0.7
+      },
+      "expected": {
+        "defectClasses": [
+          "DAMAGED",
+          "WRONG_ORIENTATION"
+        ],
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN"
+      },
+      "expectedReasons": [
+        "DEFECTS_PRESENT"
+      ]
+    },
+    {
+      "name": "good red medium has no matching pass rule",
+      "observation": {
+        "productClass": "BOX_RED",
+        "colorClass": "RED",
+        "sizeClass": "MEDIUM",
+        "defectClasses": [],
+        "confidence": 0.84
+      },
+      "expected": {
+        "qualityStatus": "GOOD",
+        "decision": "MANUAL_REVIEW",
+        "destinationBin": "MANUAL_REVIEW",
+        "ruleId": null
+      },
+      "expectedReasons": [
+        "DEFAULT_DESTINATION"
+      ]
+    },
+    {
+      "name": "physical width limit overrides a matching green pass rule",
+      "physicalLimits": {
+        "maxWidthMm": 25
+      },
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "estimatedWidthMm": 50,
+        "confidence": 0.9
+      },
+      "expected": {
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN"
+      },
+      "expectedReasons": [
+        "PHYSICAL_WIDTH_EXCEEDED"
+      ]
+    },
+    {
+      "name": "physical height limit overrides a matching green pass rule",
+      "physicalLimits": {
+        "maxHeightMm": 80
+      },
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "SMALL",
+        "estimatedHeightMm": 81,
+        "confidence": 0.9
+      },
+      "expected": {
+        "qualityStatus": "DEFECTIVE",
+        "decision": "REJECT",
+        "destinationBin": "REJECT_BIN"
+      },
+      "expectedReasons": [
+        "PHYSICAL_HEIGHT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "physical confidence floor is stricter than recipe acceptance",
+      "physicalLimits": {
+        "minConfidenceToSort": 0.95
+      },
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "sizeClass": "SMALL",
+        "confidence": 0.9
+      },
+      "expected": {
+        "qualityStatus": "MANUAL_REVIEW",
+        "decision": "MANUAL_REVIEW",
+        "destinationBin": "MANUAL_REVIEW",
+        "ruleId": null
+      },
+      "expectedReasons": [
+        "LOW_CONFIDENCE"
+      ]
+    },
+    {
+      "name": "exact physical bounds and confidence are accepted",
+      "physicalLimits": {
+        "maxWidthMm": 40,
+        "maxHeightMm": 80,
+        "minConfidenceToSort": 0.9
+      },
+      "observation": {
+        "productClass": "BOX_GREEN",
+        "colorClass": "GREEN",
+        "estimatedWidthMm": 40,
+        "estimatedHeightMm": 80,
+        "confidence": 0.9
+      },
+      "expected": {
+        "qualityStatus": "GOOD",
+        "decision": "PASS",
+        "destinationBin": "BIN_C"
+      },
+      "expectedReasons": [
+        "RULE:green-good"
+      ]
+    }
+  ]
+}

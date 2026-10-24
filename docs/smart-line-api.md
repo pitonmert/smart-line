@@ -106,6 +106,15 @@ Login başarı verisi:
 | Sensor read      | `GET /api/sensors/status`                                                                              | Viewer+   |
 | Sensor ingest    | `POST /api/sensors/barcode`, `/environment`, `/fire`                                                   | Device    |
 | Realtime         | `/hubs/dashboard`                                                                                      | Viewer+   |
+| Recipes          | `GET /api/recipes`, `/active`, `/{id}`; `POST /api/recipes`; `PUT /api/recipes/{id}`; `POST /{id}/activate` | Viewer+ read, Operator+ write |
+| Recipe snapshot  | `GET /api/recipes/active/snapshot`                                                                 | Device |
+| Calibration      | `GET/POST /api/calibration-profiles`, `PUT /{id}`, `POST /{id}/activate`                               | Viewer+ read, Operator+ write |
+| Inspections      | `GET /api/inspections`, `/{id}`                                                                        | Viewer+   |
+| Inspection ingest| `POST /api/inspections`                                                                                | Operator, Admin, or Device |
+| Tracking         | `GET /api/tracking`, `/queue`; `POST /api/tracking/{id}/release`                                       | Viewer+ read, Operator+ release |
+| Simulation       | `GET /api/simulation/status`; `POST /arrivals`, `/tick`, `/clear`                                      | Operator+ |
+| Dataset          | `GET /api/dataset/sessions`, `/{id}/images/{fileName}`; `POST` start, `/{id}/stop`, `/{id}/captures`, `/{id}/captures/camera`; `DELETE /{id}/samples/{sampleId}` | Viewer+ read; Operator, Admin, or Device write |
+| Diagnostics      | `GET /api/diagnostics`, `GET /api/control-room`                                                        | Viewer+   |
 
 Auth endpoint'leri istemci IP + endpoint başına dakikada 20; barcode/environment endpoint'leri IP + endpoint başına saniyede 100; fire endpoint'i ayrı safety bucket'ında saniyede 1000; normal conveyor control endpoint'leri kullanıcı + endpoint başına 10 saniyede 200 istekle sınırlıdır. Emergency-stop normal control limiter'ından bağımsızdır. Production, yalnız izole frontend ağındaki sabit Caddy IP'sini trusted proxy kabul eder; bu sayede rate-limit anahtarı doğrulanmış `X-Forwarded-For` istemci IP'sini kullanır.
 
@@ -142,6 +151,11 @@ Success cevaplarında `code` JSON'dan atlanır. Failure cevaplarında karar veri
 | `MQTT_UNAVAILABLE`           |        503 | Broker komutu teslim edilemedi                                                 |
 | `DATABASE_CONFLICT`          |        409 | Genel constraint/concurrency çakışması                                         |
 | `UNEXPECTED_ERROR`           |        500 | Beklenmeyen sunucu hatası                                                      |
+| `RECIPE_INVALID`             |        400 | Product Recipe tanımı geçersiz                                                 |
+| `CALIBRATION_INVALID`        |        400 | Kalibrasyon değeri tehlikeli veya anlamsız                                     |
+| `SIMULATION_DISABLED`        |        403 | Simülasyon bu ortamda kapalı                                                   |
+| `TRACKING_TRANSITION_INVALID`|        400 | Ürün durum makinesi geçişi geçersiz                                            |
+| `DATASET_INVALID`            | 400, 409, 503 | Dataset oturumu, etiket veya görüntü geçersiz. Kamera yakalama Vision yapılandırılmamışsa veya erişilemiyorsa 503, kare henüz yoksa 409 döner |
 
 Enum parser case-insensitive çalışır; numeric string'leri ve `Enum.IsDefined` dışında kalan değerleri reddeder. Public product status değerleri `OK`, `DEFECTIVE`, `NO_BARCODE`, `WRONG_COLOR`; renkler `RED`, `BLUE`, `GREEN`, `YELLOW` olarak korunur.
 
@@ -217,7 +231,13 @@ JWT, device key, MQTT topic/port/certificate path, timezone ve sıcaklık seçen
 
 ## Migration ve testler
 
-Mevcut model tek `20260809092419_InitialCreate` migration'ında toplanmıştır. Migration; domain tablolarını, Identity/role tablolarını, hash'li refresh token tablosunu, emergency/fire state ile device epoch/reset/fire generation alanlarını, singleton conveyor seed'ini ve düzeltilmiş unique index'leri içerir. Eski PostgreSQL verisiyle upgrade hedeflenmez; temiz veritabanı gerekir.
+`20260809092419_InitialCreate` ilk domain, Identity, refresh token, emergency/fire ve conveyor seed modelini kurar. `20261006094158_InspectionPlatform` product recipe, calibration, inspection history, product track ve dataset session tablolarını ekler. API açılışta `MigrateAsync` çalıştırır. Inspection sonuçları MQTT'ye yazılmaz; HTTP `POST /api/inspections` ve device key kullanılır. Bu seçim mevcut Mosquitto ACL testini genişletmez.
+
+Eski bir veritabanındaki DemoBox satırı, gömülü `demobox-legacy-320x240.json` belgesiyle birebir aynıysa kamera profili `320x240` değerinden `240x176` HQVGA profiline alınır ve sürüm bir artar. Karşılaştırma tüm tarifi kapsar. Ad, sınıf, akış adresi veya başka bir alan değişmişse satır olduğu gibi kalır. Yeni bir veritabanı doğrudan `240x176` ile başlar. Veritabanını silmek gerekmez.
+
+Kamera veri kümesi yakalaması Vision `GET /frames/dataset` çağırır. Vision önce ham RGB565 `/capture/raw` karesini tercih eder ve JPEG'i hostta üretir. Bu örneğin `captureSource` değeri `esp32_capture_raw` olur. Ham yol kullanılamazsa kamera JPEG'i `esp32_capture` olarak kalır. `409` yanıtı görüntü saklamaz ve mesaj, önizleme yedeği kapalıyken still yakalamanın başarısız olduğunu söyler. Saklanan örnek `captureSource`, `previewFallback`, `sourceWidth` ve `sourceHeight` taşır. Inspection sonucu `ResultJson` içinde `recipeVersion`, `frameRole`, `captureSource` ve `previewFallback` alanlarını tutar. Yeni kolon veya migration yoktur. `GET /api/recipes/active/snapshot` yalnız device key kabul eder ve etkin tarifin kimliğini, adını, sürümünü ve tanımını döner. Viewer bu yolu okuyamaz. Tanı yanıtı still boyunu, son still hatasını, sensör PID değerini ve etkin tarif sürümünü ekler. Bu alanlar yoksa istemci `Not reported` gösterir. Wi-Fi kimliği yoktur.
+
+`Vision:HealthUrl` boşsa tanı `NOT_CONFIGURED` olur. Adres ayarlı ama health isteği başarısızsa sonuç `OFFLINE` olur. Yalnız gövdesi `healthy` olan bir yanıt `ONLINE` sayılır. Kamera, Vision `ONLINE` değilken `UNKNOWN` kalır. Development compose bu adresi koymaz. `docker-compose.vision.yml` onu `http://vision:8090/health` yapar. Production aynı iç adresi kullanır ve portu host'a açmaz. Dataset dosyaları `Dataset:Root` altındadır; compose bunu yazılabilir `/var/lib/smartline/datasets` volume'una bağlar.
 
 `SmartLine.API.Tests` xUnit, `WebApplicationFactory` ve gerçek PostgreSQL Testcontainers kullanır. Test host'u MQTT hosted service'lerini recording fake ile değiştirir. Karşılıklı TLS, eksik/güvenilmeyen client certificate, parola ve ACL davranışı ayrıca disposable Mosquitto ile ayrı ephemeral test client container'ında CI'da doğrulanır; broker container'ına client private key mount edilmez.
 
@@ -233,3 +253,14 @@ dotnet test SmartLine.API.Tests/SmartLine.API.Tests.csproj --configuration Relea
 - Caddy aynı origin'de HTTPS sağlar; API doğrudan host portuna publish edilmez ve CORS middleware'i yoktur.
 - Firmware'deki `0°` servo güvenli konum prototip varsayımıdır. Fiziksel hardwired E-stop ve safety relay yazılımın yerine geçemez.
 - Credential rotation ve Git history remediation tamamlanmadan remote history rewrite/publish yapılmamalıdır. Ayrıntı için [deployment.md](deployment.md) kullanılır.
+
+
+## v0.2.0 integration contract
+
+- `POST /api/inspections/vision` requires Operator access and `{ "requestId": "<non-empty UUID>" }`. The API pins the active recipe revision and selected calibration before calling Vision. A changed snapshot returns 409; camera/model failure returns 503, and capture timeout returns 504. Failed inspections do not create success records. Retrying a persisted request returns 200 with the original inspection; the first successful request returns 201.
+- `GET /api/camera/preview` requires Viewer access and returns the Vision preview JPEG. Browsers do not open another ESP32 stream.
+- `POST /api/inspections` records operator/device observations. It does not infer model provenance from user-supplied model fields. Optional `recipeVersion` rejects a stale revision; optional `capturedAt` is normalized to UTC.
+- Result JSON retains `calibrationProfileId` and `calibrationVersion`. It also includes `observationSource` (`manual`, `model`, `simulation`). Manual results have no invented model name, version or inference latency. Existing records remain readable.
+- `control-room` counts and yield exclude simulation; latest result and current-product panels may still show explicitly marked simulated records.
+- Activations and inspection writes use database transactions and a shared advisory lock. Dataset storage supports one API instance; it uses a unique ACTIVE-session index, atomic manifest replacement, rollback on ordinary write errors, and startup reconciliation. Database and dataset backups must be consistent. This is not distributed filesystem/database atomic commit.
+- Calibration scale requires `sourceWidth` and `sourceHeight`; a different capture resolution produces no physical estimate. `calibrationProfileId` selects that exact stored profile; otherwise the active profile is used. Orientation, flip, perspective, physical ToF and servo actuation are not applied in this version.

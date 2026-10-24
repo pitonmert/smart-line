@@ -15,6 +15,11 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<Statistic> Statistics => Set<Statistic>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ProductRecipe> ProductRecipes => Set<ProductRecipe>();
+    public DbSet<CalibrationProfile> CalibrationProfiles => Set<CalibrationProfile>();
+    public DbSet<InspectionRecord> InspectionRecords => Set<InspectionRecord>();
+    public DbSet<ProductTrack> ProductTracks => Set<ProductTrack>();
+    public DbSet<DatasetSession> DatasetSessions => Set<DatasetSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +103,77 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             builder.HasIndex(e => e.CreatedAt);
             builder.HasIndex(e => e.Severity);
             builder.HasIndex(e => e.EventType);
+        });
+
+        modelBuilder.Entity<ProductRecipe>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.Name).HasMaxLength(80).IsRequired();
+            builder.Property(e => e.Description).HasMaxLength(1000).IsRequired();
+            builder.Property(e => e.DefinitionJson).HasColumnType("jsonb").IsRequired();
+            builder.HasIndex(e => e.Name).IsUnique();
+            builder.HasIndex(e => e.IsActive).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        });
+
+        modelBuilder.Entity<CalibrationProfile>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.Name).HasMaxLength(80).IsRequired();
+            builder.Property(e => e.Description).HasMaxLength(1000).IsRequired();
+            builder.Property(e => e.DefinitionJson).HasColumnType("jsonb").IsRequired();
+            builder.HasIndex(e => e.Name).IsUnique();
+            builder.HasIndex(e => e.IsActive).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        });
+
+        modelBuilder.Entity<InspectionRecord>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.ProductClass).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.ColorClass).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.SizeClass).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.DefectClassesJson).HasColumnType("jsonb").IsRequired();
+            builder.Property(e => e.QualityStatus).HasMaxLength(32).IsRequired();
+            builder.Property(e => e.Decision).HasMaxLength(32).IsRequired();
+            builder.Property(e => e.DestinationBin).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.ModelName).HasMaxLength(80);
+            builder.Property(e => e.ModelVersion).HasMaxLength(80);
+            builder.Property(e => e.ImageReference).HasMaxLength(300);
+            builder.Property(e => e.ResultJson).HasColumnType("jsonb").IsRequired();
+            builder.HasIndex(e => e.ProcessedAt);
+            builder.HasIndex(e => e.ProductId);
+            builder.HasIndex(e => new { e.RecipeId, e.Decision });
+            builder.HasIndex(e => e.IsSimulation);
+        });
+
+        modelBuilder.Entity<ProductTrack>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.PublicCode).HasMaxLength(32).IsRequired();
+            builder.Property(e => e.Stage).HasMaxLength(32).IsRequired();
+            builder.Property(e => e.DestinationBin).HasMaxLength(64);
+            builder.Property(e => e.Decision).HasMaxLength(32);
+            builder.Property(e => e.FailureReason).HasMaxLength(300);
+            builder.HasIndex(e => e.PublicCode).IsUnique();
+            builder.HasIndex(e => new { e.Stage, e.SortDueAt });
+            builder.HasIndex(e => e.IsSimulation);
+        });
+
+        modelBuilder.Entity<DatasetSession>(builder =>
+        {
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.RecipeName).HasMaxLength(80).IsRequired();
+            builder.Property(e => e.Status).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.ProductClass).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.QualityLabel).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.ColorLabel).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.SizeLabel).HasMaxLength(64).IsRequired();
+            builder.Property(e => e.DefectLabelsJson).HasColumnType("jsonb").IsRequired();
+            builder.Property(e => e.Notes).HasMaxLength(1000);
+            builder.Property(e => e.CaptureMode).HasMaxLength(20).IsRequired();
+            builder.Property(e => e.StoragePath).HasMaxLength(300).IsRequired();
+            builder.HasIndex(e => e.Status);
+            builder.HasIndex(e => e.Status, "IX_DatasetSessions_OneActive").IsUnique().HasFilter("\"Status\" = 'ACTIVE'");
+            builder.HasIndex(e => e.StartedAt);
         });
     }
 
