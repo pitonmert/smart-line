@@ -19,7 +19,7 @@ class HttpBodyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="smartline-http-body-") as directory:
             binary = Path(directory) / "test_http_body"
             subprocess.run(
-                [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(INCLUDE), str(SOURCE), "-o", str(binary)],
+                [compiler, "-std=c++17", "-pthread", "-Wall", "-Wextra", "-Werror", "-I", str(INCLUDE), str(SOURCE), "-o", str(binary)],
                 check=True,
             )
             completed = subprocess.run([str(binary)], check=False, capture_output=True, text=True)

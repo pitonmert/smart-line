@@ -6,7 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// stage != 0 copies each chunk into internal RAM before the socket write.
+// stage != 0 copies each chunk into a per-send internal-RAM buffer before the
+// socket write. Concurrent server tasks never share a staging buffer.
 // stage == 0 passes the caller's buffer to the socket. The debug endpoints
 // use stage == 0 so an internal payload and a PSRAM payload are not both
 // reduced to the same scratch buffer.

@@ -12,10 +12,6 @@
 #include "esp_timer.h"
 #include <lwip/sockets.h>
 
-// One HTTP server task runs handlers to completion, so this scratch buffer
-// is not shared across concurrent sends. It lives in internal BSS, not PSRAM.
-static uint8_t g_stage[SMARTLINE_HTTP_CHUNK_BYTES];
-
 struct SendContext {
   httpd_req_t* request;
   int esp_status;
@@ -60,12 +56,34 @@ int transport_send_body(
   int* esp_status
 ) {
   SendContext ctx{request, ESP_OK};
+  // Port 81 streams while port 80 serves stills. Those independent HTTPD
+  // tasks can enter here at the same time, so a file-static staging buffer
+  // corrupts whichever response loses the race. Keep this allocation scoped
+  // to one synchronous send; MALLOC_CAP_INTERNAL keeps PSRAM out of the
+  // Wi-Fi/TCP copy path without consuming another 2 KB from either task stack.
+  uint8_t* stage_buffer = nullptr;
+  if (stage) {
+    stage_buffer = static_cast<uint8_t*>(
+      heap_caps_malloc(SMARTLINE_HTTP_CHUNK_BYTES, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
+    );
+    if (stage_buffer == nullptr) {
+      if (stats != nullptr) {
+        memset(stats, 0, sizeof(*stats));
+        stats->bytes_intended = static_cast<uint32_t>(length);
+        stats->error_code = ENOMEM;
+      }
+      if (esp_status != nullptr) {
+        *esp_status = ESP_ERR_NO_MEM;
+      }
+      return -1;
+    }
+  }
   disable_nagle(request);
   const int rc = body_send(
     data,
     length,
     SMARTLINE_HTTP_CHUNK_BYTES,
-    stage ? g_stage : nullptr,
+    stage_buffer,
     finish,
     write_chunk,
     &ctx,
@@ -73,6 +91,7 @@ int transport_send_body(
     nullptr,
     stats
   );
+  free(stage_buffer);
   if (esp_status != nullptr) {
     *esp_status = ctx.esp_status;
   }

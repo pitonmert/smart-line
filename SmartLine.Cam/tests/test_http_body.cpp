@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <atomic>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -246,6 +248,73 @@ void test_stage_copies_before_the_write() {
   CHECK(std::memcmp(stage, data.data(), data.size()) == 0);
 }
 
+struct OverlapGate {
+  std::atomic<int> arrivals{0};
+};
+
+struct OverlapSink {
+  OverlapGate* gate;
+  std::vector<uint8_t> received;
+  bool waited;
+};
+
+int write_overlapping_sink(void* ctx, const BodyChunk* chunk, int* /*error_code*/, int* /*timed_out*/) {
+  OverlapSink* sink = static_cast<OverlapSink*>(ctx);
+  if (chunk->data == nullptr && chunk->length == 0) {
+    return 0;
+  }
+  // Both sends copy their first chunk before either sink reads it. A shared
+  // staging buffer would therefore make at least one response contain the
+  // other response's bytes.
+  if (!sink->waited) {
+    sink->waited = true;
+    sink->gate->arrivals.fetch_add(1, std::memory_order_release);
+    while (sink->gate->arrivals.load(std::memory_order_acquire) != 2) {
+      std::this_thread::yield();
+    }
+  }
+  sink->received.insert(sink->received.end(), chunk->data, chunk->data + chunk->length);
+  return static_cast<int>(chunk->length);
+}
+
+void test_overlapping_staged_stream_and_still_keep_their_bytes() {
+  std::vector<uint8_t> stream(5000);
+  std::vector<uint8_t> still(5000);
+  for (size_t index = 0; index < stream.size(); index++) {
+    stream[index] = static_cast<uint8_t>(index & 0xFF);
+    still[index] = static_cast<uint8_t>(0xFF - (index & 0xFF));
+  }
+  uint8_t stream_stage[SMARTLINE_HTTP_CHUNK_BYTES];
+  uint8_t still_stage[SMARTLINE_HTTP_CHUNK_BYTES];
+  OverlapGate gate = {};
+  OverlapSink stream_sink{&gate, {}, false};
+  OverlapSink still_sink{&gate, {}, false};
+  BodySendStats stream_stats = {};
+  BodySendStats still_stats = {};
+  Clock stream_clock{0, 1};
+  Clock still_clock{0, 1};
+
+  std::thread stream_send([&]() {
+    body_send(
+      stream.data(), stream.size(), SMARTLINE_HTTP_CHUNK_BYTES, stream_stage, 1,
+      write_overlapping_sink, &stream_sink, advance, &stream_clock, &stream_stats
+    );
+  });
+  std::thread still_send([&]() {
+    body_send(
+      still.data(), still.size(), SMARTLINE_HTTP_CHUNK_BYTES, still_stage, 1,
+      write_overlapping_sink, &still_sink, advance, &still_clock, &still_stats
+    );
+  });
+  stream_send.join();
+  still_send.join();
+
+  CHECK(stream_stats.complete == 1);
+  CHECK(still_stats.complete == 1);
+  CHECK(stream_sink.received == stream);
+  CHECK(still_sink.received == still);
+}
+
 void test_open_stream_does_not_end_the_response() {
   std::vector<uint8_t> data(3000, 4);
   Sink sink = {};
@@ -318,6 +387,7 @@ int main() {
   test_reset_and_not_connected_are_disconnects();
   test_rejected_writes_do_not_claim_success();
   test_stage_copies_before_the_write();
+  test_overlapping_staged_stream_and_still_keep_their_bytes();
   test_open_stream_does_not_end_the_response();
   test_terminator_failure_is_not_success();
   test_success_frees_the_owned_buffer();
