@@ -1,20 +1,16 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Identity;
 using SmartLine.API.Domain.Entities;
 
 namespace SmartLine.API.Infrastructure.Persistence;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
+    : DbContext(options)
 {
     public DbSet<Product> Products => Set<Product>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<ConveyorSetting> ConveyorSettings => Set<ConveyorSetting>();
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<Statistic> Statistics => Set<Statistic>();
-    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ProductRecipe> ProductRecipes => Set<ProductRecipe>();
     public DbSet<CalibrationProfile> CalibrationProfiles => Set<CalibrationProfile>();
     public DbSet<InspectionRecord> InspectionRecords => Set<InspectionRecord>();
@@ -24,25 +20,6 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        modelBuilder.Entity<ApplicationUser>(builder =>
-        {
-            builder.Property(x => x.CreatedAt).IsRequired();
-            builder.Property(x => x.Email).HasMaxLength(256);
-        });
-
-        modelBuilder.Entity<RefreshToken>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
-            builder.HasIndex(x => x.TokenHash).IsUnique();
-            builder.HasIndex(x => new { x.UserId, x.ExpiresAt });
-            builder
-                .HasOne(x => x.User)
-                .WithMany()
-                .HasForeignKey(x => x.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
 
         modelBuilder.Entity<Alert>(builder =>
         {

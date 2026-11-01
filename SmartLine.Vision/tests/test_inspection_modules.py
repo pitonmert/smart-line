@@ -1,4 +1,5 @@
 import json
+import io
 import sys
 import tempfile
 import unittest
@@ -10,7 +11,6 @@ sys.path.insert(0, str(SRC))
 
 from camera_stream import CameraStream
 from color_analysis import analyze_color
-from decision import decide
 from frame_selector import FrameSelector
 from inference import InferenceEngine, select_backend
 from pipeline import run_inspection
@@ -19,26 +19,6 @@ from triggers import TriggerRequest
 
 
 RECIPE = json.loads((ROOT / "SmartLine.API" / "Contracts" / "recipes" / "demobox.json").read_text())
-FIXTURES = json.loads((ROOT / "SmartLine.API" / "Contracts" / "fixtures" / "decision-cases.json").read_text())
-
-
-class DecisionTests(unittest.TestCase):
-    def test_shared_fixtures(self):
-        for case in FIXTURES["cases"]:
-            with self.subTest(case=case["name"]):
-                recipe = dict(RECIPE)
-                if "physicalLimits" in case: recipe["physicalLimits"] = case["physicalLimits"]
-                result = decide(recipe, case["observation"])
-                self.assertTrue(set(case.get("expectedReasons", [])) <= set(result["reasons"]))
-                expected = case["expected"]
-                for key, value in expected.items():
-                    self.assertEqual(value, result[key], case["name"])
-
-    def test_confidence_bounds(self):
-        with self.assertRaises(ValueError):
-            decide(RECIPE, {"confidence": 2})
-
-
 class ColorAndSizeTests(unittest.TestCase):
     def test_red_roi_is_measured_separately_from_another_roi(self):
         red = analyze_color([(220, 20, 20)] * 40, RECIPE["allowedColors"])
@@ -113,6 +93,41 @@ class StreamAndTriggerTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.TestCase):
+    def test_jpeg_dimensions_come_from_decoded_pixels(self):
+        from PIL import Image
+        output = io.BytesIO()
+        Image.new("RGB", (4, 2), (220, 20, 20)).save(output, format="JPEG")
+        result = run_inspection(
+            RECIPE,
+            {"frame": {"jpeg": output.getvalue(), "width": 999, "height": 999}, "width": 999, "height": 999},
+            {"source": "api"},
+        )
+        self.assertEqual(4, result["observation"]["sourceWidth"])
+        self.assertEqual(2, result["observation"]["sourceHeight"])
+
+    def test_inference_keeps_observation_metadata_without_a_decision(self):
+        engine = InferenceEngine(None)
+        detection = {"label": "BOX_RED", "confidence": 0.95, "x": 0, "y": 0, "width": 4, "height": 2}
+        engine.predict = lambda frame: {"available": True, "error": None, "latencyMs": 3, "backend": "test", "detections": [detection]}
+        result = run_inspection(
+            RECIPE,
+            {"frame": object(), "pixels": [(220, 20, 20)] * 30, "width": 4, "height": 2, "role": "inspection", "captureSource": "esp32_capture"},
+            {"source": "api"},
+            engine=engine,
+        )
+        observation = result["observation"]
+        self.assertEqual("BOX_RED", observation["productClass"])
+        self.assertEqual("RED", observation["colorClass"])
+        self.assertEqual(0.95, observation["confidence"])
+        self.assertEqual([detection], observation["boundingBoxes"])
+        self.assertEqual(RECIPE["model"]["version"], observation["modelVersion"])
+        self.assertEqual("inspection", observation["frameRole"])
+        self.assertEqual("esp32_capture", observation["captureSource"])
+        self.assertEqual(3, observation["processingLatencyMs"])
+        self.assertNotIn("previewDecision", result)
+        self.assertNotIn("decision", observation)
+        self.assertNotIn("destinationBin", observation)
+
     def test_missing_model_does_not_invent_boxes(self):
         engine = InferenceEngine("/tmp/smartline-missing-model.onnx")
         result = run_inspection(
@@ -126,7 +141,8 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(result["inference"]["available"])
         self.assertIsNone(result["inference"]["latencyMs"])
         self.assertEqual("BLUE", result["color"]["colorClass"])
-        self.assertTrue(result["previewDecision"]["simulation"] is False)
+        self.assertNotIn("previewDecision", result)
+        self.assertFalse(result["observation"]["simulation"])
 
     def test_backend_selection_without_loading_weights(self):
         self.assertIsNone(select_backend(None))

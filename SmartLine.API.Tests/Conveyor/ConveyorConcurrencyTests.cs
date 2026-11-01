@@ -8,7 +8,7 @@ public sealed class ConveyorConcurrencyTests(ApiFixture fixture) : ApiTestBase(f
     [Fact]
     public async Task Concurrent_start_and_emergency_requests_leave_mqtt_and_database_safe()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
 
         var requests = Enumerable
             .Range(0, 12)
@@ -62,7 +62,7 @@ public sealed class ConveyorConcurrencyTests(ApiFixture fixture) : ApiTestBase(f
     [Fact]
     public async Task Concurrent_fire_messages_create_one_transition_audit()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var responses = await Task.WhenAll(
             Enumerable
@@ -97,8 +97,8 @@ public sealed class ConveyorConcurrencyTests(ApiFixture fixture) : ApiTestBase(f
     [Fact]
     public async Task Emergency_preempts_an_in_flight_start_publish()
     {
-        using var startClient = Fixture.CreateUserClient("Operator");
-        using var emergencyClient = Fixture.CreateUserClient("Operator");
+        using var startClient = Fixture.CreateClient();
+        using var emergencyClient = Fixture.CreateClient();
         using var publishBlock = Fixture.Mqtt.BlockNextConveyorPublish(call =>
             call.Payload
             == "running=True;emergency=False;resetGeneration=0;acknowledgedFireEpoch=;acknowledgedFireGeneration=0"
@@ -137,7 +137,7 @@ public sealed class ConveyorConcurrencyTests(ApiFixture fixture) : ApiTestBase(f
     [Fact]
     public async Task Client_cancellation_cannot_abort_an_authorized_emergency_transition()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
         using var requestCancellation = new CancellationTokenSource();
         using var publishBlock = Fixture.Mqtt.BlockNextConveyorPublish(call =>
             call.Payload

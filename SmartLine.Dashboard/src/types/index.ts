@@ -62,17 +62,3 @@ export interface ApiResponse<T> {
   code?: string | null
   data: T
 }
-
-export type UserRole = 'Viewer' | 'Operator' | 'Admin'
-
-export interface AuthUser {
-  id: string
-  email: string
-  roles: UserRole[]
-}
-
-export interface AuthSession {
-  accessToken: string
-  expiresAt: string
-  user: AuthUser
-}

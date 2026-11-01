@@ -46,12 +46,15 @@ services:
 
   api:
     build:
-      context: ./SmartLine.API
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: SmartLine.API/Dockerfile
       target: final
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: 5047
+      ASPNETCORE_HTTPS_PORTS: 5443
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /run/smartline/certs/smartline.local.crt
+      ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /run/smartline/certs/smartline.local.key
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Mqtt__BrokerAddress: mosquitto
       Mqtt__Port: 8883
@@ -61,13 +64,7 @@ services:
       Mqtt__CaCertificatePath: /run/smartline/certs/ca.crt
       Mqtt__ClientCertificatePath: /run/smartline/certs/smartline-api.crt
       Mqtt__ClientKeyPath: /run/smartline/certs/smartline-api.key
-      DeviceAuthentication__Key: ${DEVICE_KEY}
-      Jwt__SigningKey: ${JWT_SIGNING_KEY}
-      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL}
-      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD}
-      ReverseProxy__KnownProxy: 172.30.0.10
       Vision__HealthUrl: http://vision:8090/health
-      Vision__ServiceKey: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
       Vision__CaptureTimeoutSeconds: ${VISION_CAPTURE_TIMEOUT_SECONDS:-35}
       Dataset__Root: /var/lib/smartline/datasets
     volumes:
@@ -75,6 +72,8 @@ services:
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.crt:/run/smartline/cert-source/smartline-api.crt:ro
       - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline-api.key:/run/smartline/cert-source/smartline-api.key:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.crt:/run/smartline/cert-source/smartline.local.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.key:/run/smartline/cert-source/smartline.local.key:ro
     tmpfs:
       - /run/smartline/certs:size=1m,mode=0700
     depends_on:
@@ -89,7 +88,9 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
-    networks: [backend, frontend]
+    ports:
+      - "443:5443"
+    networks: [backend]
 
   vision:
     build:
@@ -107,12 +108,10 @@ services:
       CAM_STREAM_URL: ${CAM_STREAM_URL}
       CAM_CAPTURE_URL: ${CAM_CAPTURE_URL:-}
       VISION_CONTROL_HOST: 0.0.0.0
-      VISION_SERVICE_KEY: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
       STILL_CAPTURE_TIMEOUT: ${STILL_CAPTURE_TIMEOUT:-30}
       MODEL_PATH: ${MODEL_PATH:-}
       MODEL_VERSION: ${MODEL_VERSION:-}
       API_BASE_URL: http://api:5047
-      DEVICE_KEY: ${DEVICE_KEY}
       ALLOW_PREVIEW_FALLBACK: "false"
       LOG_LEVEL: INFO
       SHOW_PREVIEW: "false"
@@ -131,23 +130,6 @@ services:
     restart: unless-stopped
     networks: [backend]
 
-  caddy:
-    build:
-      context: .
-      dockerfile: infra/caddy/Dockerfile
-    volumes:
-      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.crt:/etc/caddy/certs/smartline.local.crt:ro
-      - ${SMARTLINE_CERT_DIR:-./infra/certs/generated}/smartline.local.key:/etc/caddy/certs/smartline.local.key:ro
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      frontend:
-        ipv4_address: 172.30.0.10
 
 volumes:
   postgres_data:
@@ -156,7 +138,3 @@ volumes:
 
 networks:
   backend:
-  frontend:
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24

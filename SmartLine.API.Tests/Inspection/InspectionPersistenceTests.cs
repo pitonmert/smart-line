@@ -11,7 +11,7 @@ public sealed class InspectionPersistenceTests(ApiFixture fixture) : ApiTestBase
     public async Task ConcurrentActivationLeavesExactlyOneActiveRecipe()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var first = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/recipes", new { name = "First", definition = ContractCatalog.DemoBox() }), HttpStatusCode.Created);
         var second = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/recipes", new { name = "Second", definition = ContractCatalog.DemoBox() }), HttpStatusCode.Created);
         var ids = new[] { first.GetProperty("id").GetGuid(), second.GetProperty("id").GetGuid() };
@@ -24,7 +24,7 @@ public sealed class InspectionPersistenceTests(ApiFixture fixture) : ApiTestBase
     public async Task FailedActivationRollsBackPreviousActiveRecipe()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var created = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/recipes", new { name = "Fail activation", definition = ContractCatalog.DemoBox() }), HttpStatusCode.Created);
         await Fixture.WithDbContextAsync(async db =>
         {
@@ -50,7 +50,7 @@ public sealed class InspectionPersistenceTests(ApiFixture fixture) : ApiTestBase
     public async Task InspectionRetainsTheExplicitRecipeCalibrationIdentity()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var calibration = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/calibration-profiles", new { name = "Explicit", definition = ContractCatalog.Uncalibrated() }), HttpStatusCode.Created);
         var calibrationId = calibration.GetProperty("id").GetGuid();
         var recipeId = await Fixture.WithDbContextAsync(db => db.ProductRecipes.Where(r => r.IsActive).Select(r => r.Id).SingleAsync());
@@ -66,7 +66,7 @@ public sealed class InspectionPersistenceTests(ApiFixture fixture) : ApiTestBase
     public async Task StaleRecipeVersionDoesNotCreateRecords()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var response = await Fixture.CreateUserClient("Operator").PostAsJsonAsync("/api/inspections", new { recipeVersion = 999, confidence = .9 });
+        var response = await Fixture.CreateClient().PostAsJsonAsync("/api/inspections", new { recipeVersion = 999, confidence = .9 });
         await AssertErrorAsync(response, HttpStatusCode.Conflict, ErrorCodes.RecipeInvalid);
         Assert.Equal(0, await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync()));
     }

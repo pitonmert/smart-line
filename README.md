@@ -25,7 +25,7 @@ flowchart TD
   B -->|manual, API, or simulator| C["Select latest frame"]
   B -->|VL53L1X hardware| H["Rejected until integration"]
   C --> D["Detect, color ROI, visual size"]
-  D --> E["Recipe decision"]
+  D --> E["API: recipe decision"]
   E --> F["Track and sort queue"]
   F --> G["History and control room"]
 ```
@@ -78,9 +78,9 @@ flowchart TD
 | `SmartLine.Firmware` | ESP32 sensors, MQTT TLS, local emergency latch |
 | `SmartLine.Cam` | ESP32-CAM MJPEG stream |
 | `SmartLine.Vision` | Frame selection, barcode MQTT, event inspection |
-| `training/` | Cloud training and dataset tools |
+| `SmartLine.Training/` | Cloud training and dataset tools |
 
-PostgreSQL, MQTT, and the API run from Docker Compose. The dashboard uses the same origin through Vite in development and Caddy in production. There is no CORS middleware. The API stays a single Minimal API instance. MediatR, Carter, a generic repository, and a unit of work are not used.
+PostgreSQL, MQTT, and the API run from Docker Compose. The dashboard uses Vite in development; in production the API serves the Dashboard build and endpoints from the same HTTPS origin. There is no CORS middleware. The API stays a single Minimal API instance. MediatR, Carter, a generic repository, and a unit of work are not used.
 
 ## Camera
 
@@ -126,7 +126,7 @@ The control-room image uses CSS `object-fit: contain`. The bitmap is not upscale
 
 A recipe defines classes, allowed colors, size classes, defect classes, acceptance thresholds, sorting rules, destination bins, model name and version, camera profile, ROI, calibration profile, physical limits, and inspection settings. Rules live in the recipe. The vision model does not contain sorting logic.
 
-DemoBox accepts `GOOD` plus a color and size into `BIN_A`, `BIN_B`, or `BIN_C`. A rejecting defect goes to `REJECT_BIN`. Low confidence or an unmatched combination goes to `MANUAL_REVIEW`. The shared cases are in `SmartLine.API/Contracts/fixtures/decision-cases.json` and are executed by both the C# engine and `SmartLine.Vision/src/decision.py`.
+DemoBox accepts `GOOD` plus a color and size into `BIN_A`, `BIN_B`, or `BIN_C`. A rejecting defect goes to `REJECT_BIN`. Low confidence or an unmatched combination goes to `MANUAL_REVIEW`. The decision cases are in `SmartLine.API/Contracts/fixtures/decision-cases.json` and are executed by the C# engine. Vision supplies observations; only the API evaluates acceptance and selects a destination.
 
 ## Vision and local inference
 
@@ -144,46 +144,45 @@ Start a session from Dataset & AI, or:
 
 ```bash
 curl -s -X POST http://localhost:5047/api/dataset/sessions \
-  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"recipeId":null,"productClass":"BOX_RED","qualityLabel":"GOOD","colorLabel":"RED","sizeLabel":"LARGE","defectLabels":[],"notes":"bench sample","captureMode":"manual","intervalMs":null,"simulation":false}'
 ```
 
-Upload one JPEG or PNG, at most about 900 KB because the API body limit is 1 MB:
+Capture one JPEG from the camera through Vision (up to 900 KB):
 
 ```bash
-curl -s -X POST "http://localhost:5047/api/dataset/sessions/$SESSION/captures" \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "image=@sample.jpg"
+curl -s -X POST "http://localhost:5047/api/dataset/sessions/$SESSION/captures/camera" \
+  -H "Content-Type: application/json" \
+  -d '{"productClass":"BOX_RED","qualityLabel":"GOOD","colorLabel":"RED","sizeLabel":"LARGE","defectLabels":[]}'
 ```
 
-The operator path does not start from a file picker. Dataset & AI shows the live preview, takes the class, quality, color, size, and defects from the active recipe, and `Capture from camera` asks the API to store one high-quality dataset still. The page then shows the thumbnail, measured pixel size, capture source, timestamp, labels, and capture count. If the still fails and preview fallback is disabled, the API returns an error and stores nothing. The browser does not read the MJPEG element. Optional interval capture repeats that same request with the labels on screen. An accidental sample can be discarded while the session is still active. Uploading a JPEG or PNG remains a secondary import.
+The operator path does not start from a file picker. Dataset & AI shows the live preview, takes the class, quality, color, size, and defects from the active recipe, and `Capture from camera` asks the API to store one high-quality dataset still. The page then shows the thumbnail, measured pixel size, capture source, timestamp, labels, and capture count. If the still fails and preview fallback is disabled, the API returns an error and stores nothing. The browser does not read the MJPEG element. Optional interval capture repeats that same request with the labels on screen. An accidental sample can be discarded while the session is still active. PC file uploads are not supported. Vision fully decodes existing JPEG frames before returning them; the API checks payload size and basic JPEG framing without decoding them again. Existing PNG dataset images remain readable.
 
-The API database is the only recipe authority. Vision reads `GET /api/recipes/active/snapshot` with the device key, which stays in the Vision process. A validated snapshot on an inspection request is also accepted. `RECIPE_PATH` is only the offline fallback. Every stored inspection records the recipe version.
+The API database is the only recipe authority. Vision reads `GET /api/recipes/active/snapshot` without a device key. A validated snapshot on an inspection request is also accepted. `RECIPE_PATH` is only the offline fallback. Every stored inspection records the recipe version.
 
 The manifest records the operator labels, timestamp, camera metadata, file name, and SHA-256. `annotated` stays false. Bounding boxes are not invented. Hardware-trigger capture is rejected unless the session is explicitly marked simulation.
 
 Validate and export only real labels:
 
 ```bash
-python3 training/dataset_tools.py validate --manifest datasets/session/manifest.jsonl --images datasets/session/images
-python3 training/dataset_tools.py export-yolo --manifest datasets/session/manifest.jsonl --images datasets/session/images --output datasets/yolo/demobox --classes BOX_RED,BOX_BLUE,BOX_GREEN
+python3 SmartLine.Training/dataset_tools.py validate --manifest datasets/session/manifest.jsonl --images datasets/session/images
+python3 SmartLine.Training/dataset_tools.py export-yolo --manifest datasets/session/manifest.jsonl --images datasets/session/images --output datasets/yolo/demobox --classes BOX_RED,BOX_BLUE,BOX_GREEN
 ```
 
 Draw boxes in CVAT or Label Studio using the recipe class names. Import those boxes back into the manifest with `annotated: true`, `sourceWidth`, and `sourceHeight`, or keep the tool's YOLO labels. Empty label files are allowed only for images that were reviewed and contain no object. Unannotated images are skipped.
 
 ## Cloud training
 
-Do not train on the local AMD GPU. Kaggle Notebooks with a GPU are the primary path: `training/notebooks/smartline_kaggle.ipynb`. Google Colab is the fallback: `training/notebooks/smartline_colab.ipynb`. A RunPod GPU pod can run the same commands:
+Do not train on the local AMD GPU. Kaggle Notebooks with a GPU are the primary path: `SmartLine.Training/notebooks/smartline_kaggle.ipynb`. Google Colab is the fallback: `SmartLine.Training/notebooks/smartline_colab.ipynb`. A RunPod GPU pod can run the same commands:
 
 ```bash
-python3 -m pip install -r training/requirements.txt
-python3 training/train.py --config training/configs/detect.yaml --execute
-python3 training/evaluate.py --results runs/smartline/demobox-detect/results.csv
-python3 training/export.py --weights runs/smartline/demobox-detect/weights/best.pt --execute
+python3 -m pip install -r SmartLine.Training/requirements.txt
+python3 SmartLine.Training/train.py --config SmartLine.Training/configs/detect.yaml --execute
+python3 SmartLine.Training/evaluate.py --results runs/smartline/demobox-detect/results.csv
+python3 SmartLine.Training/export.py --weights runs/smartline/demobox-detect/weights/best.pt --execute
 ```
 
-v0.2.0 supports detection preparation with Ultralytics YOLO26 (`yolo26n`). Classification and segmentation are deferred. Pins are in `training/requirements.txt`. The Kaggle notebook checks CUDA, prints the GPU name and VRAM, installs those pins, refuses a dataset without labels, trains, validates, exports ONNX, prepares OpenVINO, and leaves the run folder for download. It contains no credentials.
+v0.2.0 supports detection preparation with Ultralytics YOLO26 (`yolo26n`). Classification and segmentation are deferred. Pins are in `SmartLine.Training/requirements.txt`. The Kaggle notebook checks CUDA, prints the GPU name and VRAM, installs those pins, refuses a dataset without labels, trains, validates, exports ONNX, prepares OpenVINO, and leaves the run folder for download. It contains no credentials.
 
 No training run has been executed in this repository. `models/registry/demobox.json` keeps `metrics` null. `evaluate.py` will not fill in accuracy, mAP, precision, or recall when `results.csv` is missing.
 
@@ -191,7 +190,7 @@ No training run has been executed in this repository. `models/registry/demobox.j
 
 1. Review the real `results.csv` and confusion matrix from the cloud run.
 2. Copy the chosen `.pt`, ONNX file, or OpenVINO directory into `models/runtime/`. Record the registry fields and SHA-256. Do not commit the binaries.
-3. Run `python3 training/validate_registry.py --registry models/registry/demobox.json --recipe SmartLine.API/Contracts/recipes/demobox.json`. It exits 2 until the artifact exists, the checksum matches, the format is `.pt`, `.onnx`, `.xml`, or an OpenVINO directory, and the class list matches the recipe.
+3. Run `python3 SmartLine.Training/validate_registry.py --registry models/registry/demobox.json --recipe SmartLine.API/Contracts/recipes/demobox.json`. It exits 2 until the artifact exists, the checksum matches, the format is `.pt`, `.onnx`, `.xml`, or an OpenVINO directory, and the class list matches the recipe.
 4. Set the recipe `model.artifactFileName` and version with `PUT /api/recipes/{id}`.
 5. Point Vision at the artifact and run one manual inspection:
 
@@ -212,11 +211,11 @@ Physical VL53L1X integration is deferred. The contracts reserve `productPresent`
 
 ## Security
 
-Roles are `Viewer`, `Operator`, and `Admin`. Device traffic uses a separate `Device` identity and `X-Device-Key`. Access tokens last 15 minutes. Refresh tokens last 7 days, are stored as a hash, and rotate in a hardened cookie. There is no public registration. The first Admin is created only when the user table is empty, from `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`. Later users are created by an Admin at `POST /api/admin/users` and `PUT /api/admin/users/{id}/role`. The dashboard keeps the access token in memory. SignalR uses `accessTokenFactory`.
+The Dashboard opens directly. REST API and SignalR endpoints require no login, roles, JWT, refresh cookies, device keys or service keys. All clients that can reach these HTTP endpoints can use them; MQTT certificate/password authentication and physical safety interlocks remain separate.
 
 Mosquitto rejects anonymous and plaintext clients. Clients use mutual TLS on port 8883, a local CA, a username and password, and a principal ACL. Vision may publish only `smartline/sensors/barcode`. Inspection results are HTTP so that ACL does not grow. Diagnostics omit secrets.
 
-Normal stop, emergency stop, the fire latch, and Admin reset are separate. During provisioning the firmware stores a random `deviceEpoch`. Each local fire event advances a persistent `fireGeneration` inside that epoch, and each Admin reset advances a monotonic `resetGeneration`. Firmware accepts reset or start only when the API acknowledges the same `(deviceEpoch, fireGeneration)` pair. The epoch, latch, and counters are one validated NVS record. A missing or corrupt record fails closed. Clearing the fire sensor does not open the latch. Reset does not start the conveyor.
+Normal stop, emergency stop, the fire latch, and manual reset are separate. During provisioning the firmware stores a random `deviceEpoch`. Each local fire event advances a persistent `fireGeneration` inside that epoch, and each manual reset advances a monotonic `resetGeneration`. Firmware accepts reset or start only when the API acknowledges the same `(deviceEpoch, fireGeneration)` pair. The epoch, latch, and counters are one validated NVS record. A missing or corrupt record fails closed. Clearing the fire sensor does not open the latch. Reset does not start the conveyor.
 
 Servo `0°` is the safe position of this prototype. It does not remove power from a real belt motor. A hardwired emergency stop and a safety relay are outside this software.
 
@@ -249,7 +248,7 @@ docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.visio
 | MQTT TLS | `localhost:8883` |
 | Vision control | `http://127.0.0.1:8090/health` when the vision overlay is running |
 
-The Vite dev server proxies `/api` and `/hubs`. The sensor simulator device key stays in the proxy process and is not written into the browser bundle.
+The Vite dev server proxies `/api` and `/hubs`. No HTTP credentials are injected by the development server.
 
 Firmware, using the example headers and a local password that matches `.env`:
 
@@ -272,7 +271,7 @@ docker compose --env-file .env up -d --build
 docker compose ps
 ```
 
-Install `infra/certs/generated/ca.crt` as a trusted root on client devices and resolve `smartline.local` to the production host. The static dashboard and API are served only through Caddy. See [docs/deployment.md](docs/deployment.md).
+Install `infra/certs/generated/ca.crt` as a trusted root on client devices and resolve `smartline.local` to the production host. ASP.NET Core serves the static Dashboard and API directly over HTTPS; no reverse proxy is required. See [docs/deployment.md](docs/deployment.md).
 
 ## Testing
 
@@ -290,9 +289,9 @@ npm run lint
 npm run build
 
 cd ..
-python3 -m compileall -q SmartLine.Vision/src training
+python3 -m compileall -q SmartLine.Vision/src SmartLine.Training
 python3 -m unittest discover -s SmartLine.Vision/tests -p 'test_*.py'
-python3 -m unittest discover -s training/tests -p 'test_*.py'
+python3 -m unittest discover -s SmartLine.Training/tests -p 'test_*.py'
 docker compose --env-file .env config --quiet
 ```
 
@@ -308,7 +307,7 @@ GitHub Actions also builds both PlatformIO environments, checks Mosquitto TLS an
 | [docs/smart-line-vision.md](docs/smart-line-vision.md) | Event inspection and barcode MQTT |
 | [docs/smart-line-cam.md](docs/smart-line-cam.md) | GC2145 RGB565 to MJPEG |
 | [docs/deployment.md](docs/deployment.md) | Production certificates and compose |
-| [training/README.md](training/README.md) | Kaggle, Colab, RunPod, and model activation |
+| [SmartLine.Training/README.md](SmartLine.Training/README.md) | Kaggle, Colab, RunPod, and model activation |
 | [docs/roadmap.md](docs/roadmap.md) | Hardening status |
 
 ## Known limits
@@ -326,6 +325,6 @@ GitHub Actions also builds both PlatformIO environments, checks Mosquitto TLS an
 
 See [the integration status](v0.2.0-integration-status.md) for verified behavior, remaining hardware acceptance, and the complete source-file disposition. This is a local integration candidate, not a published release. No trained model or physical sorting success is claimed.
 
-The API owns inspection persistence. Operators trigger `POST /api/inspections/vision` with a stable `requestId`; retries return the stored result. Manual observations remain separate. Dashboard preview is fetched through the authenticated API, so Vision is the camera's single MJPEG consumer. Stream uses port 81; capture/status use port 80.
+The API owns inspection persistence. Operators trigger `POST /api/inspections/vision` with a stable `requestId`; retries return the stored result. Manual observations remain separate. Dashboard preview is fetched through the API, so Vision is the camera's single MJPEG consumer. Stream uses port 81; capture/status use port 80.
 
 Future scope and acceptance criteria: [deferred work](docs/v0.2.0-deferred-scope.md).

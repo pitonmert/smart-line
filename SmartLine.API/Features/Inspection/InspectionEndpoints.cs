@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SmartLine.API.Domain.Entities;
 using SmartLine.API.Domain.Inspection;
-using SmartLine.API.Infrastructure.Authentication;
 using SmartLine.API.Infrastructure.Configuration;
 using SmartLine.API.Infrastructure.Messaging.Mqtt;
 using SmartLine.API.Infrastructure.Persistence;
@@ -39,9 +38,9 @@ public static class InspectionEndpoints
                 InspectionJson.Deserialize<ProductRecipeDefinition>(recipe.DefinitionJson)
             );
             return Results.Ok(ApiResponse<ActiveRecipeSnapshot>.Success(snapshot));
-        }).RequireAuthorization(AuthPolicies.Device);
+        });
 
-        var group = app.MapGroup("/api/recipes").RequireAuthorization(AuthPolicies.Viewer);
+        var group = app.MapGroup("/api/recipes");
         group.MapGet("", async (ApplicationDbContext db, CancellationToken ct) =>
             Results.Ok(ApiResponse<List<RecipeResponse>>.Success(await RecipesAsync(db, ct))));
         group.MapGet("/active", async (ApplicationDbContext db, CancellationToken ct) =>
@@ -62,12 +61,11 @@ public static class InspectionEndpoints
         {
             var saved = await SaveRecipeAsync(null, request, db, factory, vision.Value, ct);
             return Results.Created($"/api/recipes/{saved.Id}", ApiResponse<RecipeResponse>.Success(saved, "Product recipe created."));
-        }).RequireAuthorization(AuthPolicies.Operator);
+        });
         group.MapPut("/{id:guid}", async (Guid id, RecipeWriteRequest request, ApplicationDbContext db, IHttpClientFactory factory, IOptions<VisionEndpointOptions> vision, CancellationToken ct) =>
         {
             return Results.Ok(ApiResponse<RecipeResponse>.Success(await SaveRecipeAsync(id, request, db, factory, vision.Value, ct), "Product recipe updated."));
-        })
-            .RequireAuthorization(AuthPolicies.Operator);
+        });
         group.MapPost("/{id:guid}/activate", async (Guid id, ApplicationDbContext db, IHttpClientFactory factory, IOptions<VisionEndpointOptions> vision, CancellationToken ct) =>
         {
             await using var transaction = await InspectionTransaction.BeginAsync(db, ct);
@@ -84,12 +82,12 @@ public static class InspectionEndpoints
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(ApiResponse<RecipeResponse>.Success((await RecipesAsync(db, ct)).First(item => item.Id == id), "Product recipe activated."));
-        }).RequireAuthorization(AuthPolicies.Operator);
+        });
     }
 
     private static void MapCalibration(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/calibration-profiles").RequireAuthorization(AuthPolicies.Viewer);
+        var group = app.MapGroup("/api/calibration-profiles");
         group.MapGet("", async (ApplicationDbContext db, CancellationToken ct) =>
             Results.Ok(ApiResponse<List<CalibrationResponse>>.Success(await CalibrationsAsync(db, ct))));
         group.MapGet("/active", async (ApplicationDbContext db, CancellationToken ct) =>
@@ -103,10 +101,9 @@ public static class InspectionEndpoints
         {
             var saved = await SaveCalibrationAsync(null, request, db, ct);
             return Results.Created($"/api/calibration-profiles/{saved.Id}", ApiResponse<CalibrationResponse>.Success(saved, "Calibration profile created."));
-        }).RequireAuthorization(AuthPolicies.Operator);
+        });
         group.MapPut("/{id:guid}", async (Guid id, CalibrationWriteRequest request, ApplicationDbContext db, CancellationToken ct) =>
-            Results.Ok(ApiResponse<CalibrationResponse>.Success(await SaveCalibrationAsync(id, request, db, ct), "Calibration profile updated.")))
-            .RequireAuthorization(AuthPolicies.Operator);
+            Results.Ok(ApiResponse<CalibrationResponse>.Success(await SaveCalibrationAsync(id, request, db, ct), "Calibration profile updated.")));
         group.MapPost("/{id:guid}/activate", async (Guid id, ApplicationDbContext db, CancellationToken ct) =>
         {
             await using var transaction = await InspectionTransaction.BeginAsync(db, ct);
@@ -122,7 +119,7 @@ public static class InspectionEndpoints
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(ApiResponse<CalibrationResponse>.Success((await CalibrationsAsync(db, ct)).First(item => item.Id == id)));
-        }).RequireAuthorization(AuthPolicies.Operator);
+        });
     }
 
     private static void MapInspections(IEndpointRouteBuilder app)
@@ -172,7 +169,7 @@ public static class InspectionEndpoints
                 rows.RemoveAt(rows.Count - 1);
             return Results.Ok(ApiResponse<PagedResult<InspectionResult>>.Success(
                 new PagedResult<InspectionResult>(rows.Select(row => InspectionJson.Deserialize<InspectionResult>(row.ResultJson)).ToList(), hasNext, page.PageNumber, page.PageSize)));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
 
         group.MapGet("/{id:guid}", async (Guid id, ApplicationDbContext db, CancellationToken ct) =>
         {
@@ -180,18 +177,18 @@ public static class InspectionEndpoints
             return row is null
                 ? Results.NotFound(ApiResponse<InspectionResult>.Error("Inspection was not found.", ErrorCodes.ResourceNotFound))
                 : Results.Ok(ApiResponse<InspectionResult>.Success(InspectionJson.Deserialize<InspectionResult>(row.ResultJson)));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
 
         group.MapPost("", async (InspectionSubmitRequest request, InspectionWorkflow workflow, CancellationToken ct) =>
         {
             var completed = await workflow.SubmitAsync(request.ToObservation(), request.RecipeId, request.ProductId, null, null, ct, request.RecipeVersion);
             return Results.Created($"/api/inspections/{completed.Inspection.InspectionId}", ApiResponse<CompletedInspection>.Success(completed, "Inspection recorded."));
-        }).RequireAuthorization(AuthPolicies.OperatorOrDevice);
+        });
     }
 
     private static void MapTracking(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/tracking").RequireAuthorization(AuthPolicies.Viewer);
+        var group = app.MapGroup("/api/tracking");
         group.MapGet("", async (bool? activeOnly, ApplicationDbContext db, CancellationToken ct) =>
         {
             var query = db.ProductTracks.AsNoTracking();
@@ -212,12 +209,12 @@ public static class InspectionEndpoints
         {
             var track = await workflow.ReleaseAsync(id, ct);
             return Results.Ok(ApiResponse<ReleaseResponse>.Success(new ReleaseResponse(track, workflow.Actuation()), "Logical sort recorded. No actuator command was sent."));
-        }).RequireAuthorization(AuthPolicies.Operator);
+        });
     }
 
     private static void MapSimulation(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/simulation").RequireAuthorization(AuthPolicies.Operator);
+        var group = app.MapGroup("/api/simulation");
         group.MapGet("/status", async (SimulationLatch latch, ApplicationDbContext db, IOptions<SimulationOptions> options, CancellationToken ct) =>
             Results.Ok(ApiResponse<SimulationStatusResponse>.Success(await SimulationStatusAsync(latch, db, options.Value.Enabled, ct))));
         group.MapPost("/arrivals", async (SimulationArrivalRequest request, InspectionWorkflow workflow, SimulationLatch latch, IOptions<SimulationOptions> options, CancellationToken ct) =>
@@ -247,50 +244,33 @@ public static class InspectionEndpoints
     {
         var group = app.MapGroup("/api/dataset/sessions");
         group.MapGet("", async (DatasetStore store, CancellationToken ct) =>
-            Results.Ok(ApiResponse<IReadOnlyList<DatasetSessionResponse>>.Success(await store.ListAsync(ct))))
-            .RequireAuthorization(AuthPolicies.Viewer);
+            Results.Ok(ApiResponse<IReadOnlyList<DatasetSessionResponse>>.Success(await store.ListAsync(ct))));
         group.MapGet("/active", async (DatasetStore store, CancellationToken ct) =>
         {
             var active = (await store.ListAsync(ct)).FirstOrDefault(item => item.Status == "ACTIVE");
             return active is null
                 ? Results.NotFound(ApiResponse<DatasetSessionResponse>.Error("No dataset session is active.", ErrorCodes.ResourceNotFound))
                 : Results.Ok(ApiResponse<DatasetSessionResponse>.Success(active));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
         group.MapGet("/{id:guid}", async (Guid id, DatasetStore store, CancellationToken ct) =>
         {
             var session = await store.GetAsync(id, ct);
             return session is null
                 ? Results.NotFound(ApiResponse<DatasetSessionResponse>.Error("Dataset session was not found.", ErrorCodes.ResourceNotFound))
                 : Results.Ok(ApiResponse<DatasetSessionResponse>.Success(session));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
         group.MapGet("/{id:guid}/images/{fileName}", async (Guid id, string fileName, DatasetStore store, CancellationToken ct) =>
         {
             var image = await store.ReadImageAsync(id, fileName, ct);
             return image is null ? Results.NotFound() : Results.File(image.Value.Bytes, image.Value.ContentType);
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
         group.MapPost("", async (DatasetStartRequest request, DatasetStore store, CancellationToken ct) =>
         {
             var session = await store.StartAsync(request.RecipeId, request.ProductClass, request.QualityLabel, request.ColorLabel, request.SizeLabel, request.DefectLabels ?? [], request.Notes, request.CaptureMode, request.IntervalMs, request.Simulation, ct);
             return Results.Created($"/api/dataset/sessions/{session.SessionId}", ApiResponse<DatasetSessionResponse>.Success(session, "Dataset session started."));
-        }).RequireAuthorization(AuthPolicies.OperatorOrDevice);
+        });
         group.MapPost("/{id:guid}/stop", async (Guid id, DatasetStore store, CancellationToken ct) =>
-            Results.Ok(ApiResponse<DatasetSessionResponse>.Success(await store.StopAsync(id, ct), "Dataset session stopped.")))
-            .RequireAuthorization(AuthPolicies.OperatorOrDevice);
-        group.MapPost("/{id:guid}/captures", async (Guid id, HttpRequest request, DatasetStore store, CancellationToken ct) =>
-        {
-            if (!request.HasFormContentType)
-                throw new ValidationException("Capture requires a multipart image.", ErrorCodes.DatasetInvalid);
-            var form = await request.ReadFormAsync(ct);
-            var file = form.Files.GetFile("image") ?? form.Files.FirstOrDefault();
-            if (file is null)
-                throw new ValidationException("Capture requires an image file.", ErrorCodes.DatasetInvalid);
-            if (file.Length == 0 || file.Length > 900_000) throw new ValidationException("Image must be under 900 KB.", ErrorCodes.DatasetInvalid);
-            await using var stream = file.OpenReadStream();
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory, ct);
-            var captured = await store.CaptureAsync(id, memory.ToArray(), file.ContentType, file.FileName, ct);
-            return Results.Ok(ApiResponse<DatasetSessionResponse>.Success(captured.Session, "Image stored. Bounding boxes were not invented."));
-        }).RequireAuthorization(AuthPolicies.OperatorOrDevice).DisableAntiforgery();
+            Results.Ok(ApiResponse<DatasetSessionResponse>.Success(await store.StopAsync(id, ct), "Dataset session stopped.")));
         group.MapPost("/{id:guid}/captures/camera", async (
             Guid id,
             DatasetCameraCaptureRequest request,
@@ -302,7 +282,6 @@ public static class InspectionEndpoints
             var captured = await store.CaptureAsync(
                 id,
                 frame.Jpeg,
-                "image/jpeg",
                 "vision-dataset-frame.jpg",
                 new DatasetCaptureDetails(
                     request.ProductClass,
@@ -323,13 +302,12 @@ public static class InspectionEndpoints
                 ct
             );
             return Results.Ok(ApiResponse<DatasetCaptureResult>.Success(captured, "Camera frame stored. Bounding boxes were not invented."));
-        }).RequireAuthorization(AuthPolicies.OperatorOrDevice).DisableAntiforgery();
+        }).DisableAntiforgery();
         group.MapDelete("/{id:guid}/samples/{sampleId:guid}", async (Guid id, Guid sampleId, DatasetStore store, CancellationToken ct) =>
             Results.Ok(ApiResponse<DatasetSessionResponse>.Success(
                 await store.RejectAsync(id, sampleId, ct),
                 "Capture discarded. The image file was removed."
-            )))
-            .RequireAuthorization(AuthPolicies.OperatorOrDevice);
+            )));
     }
 
     private static void MapDiagnostics(IEndpointRouteBuilder app)
@@ -422,7 +400,7 @@ public static class InspectionEndpoints
                 recipe?.Version
             );
             return Results.Ok(ApiResponse<DiagnosticsResponse>.Success(response));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
 
         app.MapGet("/api/control-room", async (ApplicationDbContext db, SimulationLatch latch, CancellationToken ct) =>
         {
@@ -454,7 +432,7 @@ public static class InspectionEndpoints
                 latch.IsLatched || inFlight > 0 || latest?.Simulation == true
             );
             return Results.Ok(ApiResponse<ControlRoomResponse>.Success(response));
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
     }
 
     private static async Task<List<RecipeResponse>> RecipesAsync(ApplicationDbContext db, CancellationToken ct) =>

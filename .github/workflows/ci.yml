@@ -139,10 +139,6 @@ jobs:
       MQTT_API_PASSWORD: ci-only-api-password-0000000000000000
       MQTT_FIRMWARE_PASSWORD: ci-only-firmware-password-00000000000
       MQTT_VISION_PASSWORD: ci-only-vision-password-0000000000000
-      DEVICE_KEY: "dddddddddddddddddddddddddddddddd"
-      JWT_SIGNING_KEY: "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
-      BOOTSTRAP_ADMIN_EMAIL: admin@smartline.test
-      BOOTSTRAP_ADMIN_PASSWORD: Ci-Admin-Password-123!
       CAM_STREAM_URL: http://127.0.0.1:81/stream
       SMARTLINE_CERT_DIR: /tmp/smartline-mqtt-trusted-certs
       SMARTLINE_CERT_OUTPUT_DIR: /tmp/smartline-mqtt-trusted-certs
@@ -220,13 +216,13 @@ jobs:
         run: python -m pip install numpy Pillow==12.3.0
 
       - name: Compile Vision, camera smoke, and training modules
-        run: python -m compileall -q SmartLine.Vision/src SmartLine.Cam/scripts SmartLine.Cam/tests training
+        run: python -m compileall -q SmartLine.Vision/src SmartLine.Cam/scripts SmartLine.Cam/tests SmartLine.Training
 
       - name: Run Vision, camera smoke, and training unit tests
         run: |
           python -m unittest discover -s SmartLine.Vision/tests -p 'test_*.py'
           python -m unittest discover -s SmartLine.Cam/tests -p 'test_*.py'
-          python -m unittest discover -s training/tests -p 'test_*.py'
+          python -m unittest discover -s SmartLine.Training/tests -p 'test_*.py'
 
   secrets:
     name: Gitleaks full repository scan

@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import { ErrorNote, Panel } from '../components/inspection/ui'
 import { usePolling } from '../hooks/usePolling'
 import type { RecipeSummary } from '../types/inspection'
 
 export default function RecipesPage() {
-  const { hasMinimumRole } = useAuth()
   const recipes = usePolling(() => api.getRecipes(), 8000)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +36,7 @@ export default function RecipesPage() {
       </Panel>
       {recipe && (
         <div className="flex flex-col gap-4">
-          <Panel title={recipe.name} action={hasMinimumRole('Operator') && !recipe.isActive ? <button type="button" className="rounded bg-primary px-3 py-1 text-xs text-white" onClick={() => activate(recipe)}>Activate</button> : undefined}>
+          <Panel title={recipe.name} action={!recipe.isActive ? <button type="button" className="rounded bg-primary px-3 py-1 text-xs text-white" onClick={() => activate(recipe)}>Activate</button> : undefined}>
             <p className="text-sm text-text-muted">{recipe.description}</p>
             <p className="mt-2 text-xs">Version {recipe.version}. DemoBox is the first pipeline. Another recipe can replace it without changing the decision engine.</p>
             {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}

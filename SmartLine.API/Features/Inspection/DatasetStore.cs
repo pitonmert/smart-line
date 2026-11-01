@@ -183,25 +183,15 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
     public async Task<DatasetCaptureResult> CaptureAsync(
         Guid sessionId,
         byte[] image,
-        string? mediaType,
-        string? sourceFileName,
-        CancellationToken ct
-    ) => await CaptureAsync(sessionId, image, mediaType, sourceFileName, null, ct);
-
-    public async Task<DatasetCaptureResult> CaptureAsync(
-        Guid sessionId,
-        byte[] image,
-        string? mediaType,
         string? sourceFileName,
         DatasetCaptureDetails? details,
         CancellationToken ct
     )
-    => await WriteAsync(() => CaptureCoreAsync(sessionId, image, mediaType, sourceFileName, details, ct), ct, sessionId);
+    => await WriteAsync(() => CaptureCoreAsync(sessionId, image, sourceFileName, details, ct), ct, sessionId);
 
     private async Task<DatasetCaptureResult> CaptureCoreAsync(
         Guid sessionId,
         byte[] image,
-        string? mediaType,
         string? sourceFileName,
         DatasetCaptureDetails? details,
         CancellationToken ct
@@ -217,7 +207,10 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             );
         if (image.Length == 0 || image.Length > 900_000)
             throw new ValidationException("Image must be a non-empty file under 900 KB.", ErrorCodes.DatasetInvalid);
-        var extension = ExtensionFor(image, mediaType);
+        // Vision owns image decoding; the API checks the camera payload before storing it.
+        if (image.Length < 4 || image[0] != 0xFF || image[1] != 0xD8 || image[2] != 0xFF
+            || image[^2] != 0xFF || image[^1] != 0xD9)
+            throw new ValidationException("Vision must return a JPEG frame.", ErrorCodes.DatasetInvalid);
         var capture = details ?? new DatasetCaptureDetails();
         var gate = Gates.GetOrAdd(session.Id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
@@ -226,7 +219,7 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             await ApplyLabelsAsync(session, capture.ReplaceLabels ? capture : new DatasetCaptureDetails(session.ProductClass, session.QualityLabel, session.ColorLabel, session.SizeLabel, InspectionJson.Deserialize<List<string>>(session.DefectLabelsJson), session.Notes), ct);
             var sampleId = Guid.NewGuid();
             var capturedAt = DateTime.UtcNow;
-            var fileName = $"{capturedAt:yyyyMMddTHHmmssfff}-{sampleId:N}{extension}";
+            var fileName = $"{capturedAt:yyyyMMddTHHmmssfff}-{sampleId:N}.jpg";
             var relative = Path.Combine("images", fileName);
             var fullPath = Path.Combine(session.StoragePath, relative);
             await File.WriteAllBytesAsync(fullPath, image, ct);
@@ -590,29 +583,6 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
 
     private static string Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "" : value.Trim().ToUpperInvariant();
-
-    private static string ExtensionFor(byte[] image, string? mediaType)
-    {
-        try
-        {
-            using var stream = new MemoryStream(image, false);
-            using var codec = SkiaSharp.SKCodec.Create(stream);
-            if (codec is not null && codec.Info.Width > 0 && codec.Info.Height > 0 && (long)codec.Info.Width * codec.Info.Height <= 16_000_000)
-            {
-                using var bitmap = new SkiaSharp.SKBitmap(codec.Info);
-                if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) == SkiaSharp.SKCodecResult.Success)
-                {
-                    if (codec.EncodedFormat == SkiaSharp.SKEncodedImageFormat.Jpeg && (mediaType is null || mediaType.Contains("jpeg", StringComparison.OrdinalIgnoreCase))) return ".jpg";
-                    if (codec.EncodedFormat == SkiaSharp.SKEncodedImageFormat.Png && (mediaType is null || mediaType.Contains("png", StringComparison.OrdinalIgnoreCase))) return ".png";
-                }
-            }
-        }
-        catch (Exception error) when (error is InvalidDataException or NotSupportedException or ArgumentException) { }
-        throw new ValidationException(
-            "Only a structurally valid JPEG or PNG can be stored. Unreadable images are rejected.",
-            ErrorCodes.DatasetInvalid
-        );
-    }
 }
 
 public sealed record DatasetManifestEntry(

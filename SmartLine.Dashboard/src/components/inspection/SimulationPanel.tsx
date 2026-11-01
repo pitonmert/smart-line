@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { api, getApiErrorMessage } from '../../api/client'
 import { usePolling } from '../../hooks/usePolling'
-import { useAuth } from '../../auth/AuthContext'
 import { fieldClass } from './format'
 import { ErrorNote, Panel } from './ui'
 
@@ -12,12 +11,11 @@ const presets = [
 ]
 
 export default function SimulationPanel({ onChanged }: { onChanged?: () => void }) {
-  const { hasMinimumRole } = useAuth()
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const status = usePolling(() => api.getSimulationStatus(), 8000)
-  const canOperate = hasMinimumRole('Operator') && status.data?.enabled === true
+  const canOperate = status.data?.enabled === true
 
   const arrive = async (preset: (typeof presets)[number]) => {
     setBusy(true)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import unittest
@@ -21,8 +22,15 @@ from rgb565 import decode_bgr565_be, decode_rgb565_be
 from still_capture import StillCapture, StillImage, capture_url, raw_capture_url, status_url
 
 
-LIVE = b"\xff\xd8\xff\xd9"
-STILL = b"\xff\xd8\xff\x00\xd9"
+def jpeg(width, height):
+    from PIL import Image
+    output = io.BytesIO()
+    Image.new("RGB", (width, height), (220, 20, 20)).save(output, format="JPEG")
+    return output.getvalue()
+
+
+LIVE = jpeg(240, 176)
+STILL = jpeg(640, 480)
 
 
 def urlsplit_path(url: str) -> str:
@@ -206,7 +214,7 @@ class RecipeSourceTests(unittest.TestCase):
 
         def transport(_url, headers):
             calls["count"] += 1
-            self.assertEqual("device-secret", headers["X-Device-Key"])
+            self.assertNotIn("X-Device-Key", headers)
             return {
                 "data": {
                     "id": "recipe-9",
@@ -216,7 +224,7 @@ class RecipeSourceTests(unittest.TestCase):
                 }
             }
 
-        source = ActiveRecipeSource("http://api:5047", "device-secret", FILE_RECIPE, transport=transport, ttl_seconds=30)
+        source = ActiveRecipeSource("http://api:5047", FILE_RECIPE, transport=transport, ttl_seconds=30)
         recipe, meta = source.resolve(None)
         self.assertEqual("api", meta["source"])
         self.assertEqual(9, recipe["version"])
@@ -233,7 +241,7 @@ class RecipeSourceTests(unittest.TestCase):
         def fail(_url, _headers):
             raise RuntimeError("offline")
 
-        cold = ActiveRecipeSource("http://api:5047", "device-secret", FILE_RECIPE, transport=fail)
+        cold = ActiveRecipeSource("http://api:5047", FILE_RECIPE, transport=fail)
         recipe, meta = cold.resolve(None)
         self.assertEqual("file", meta["source"])
         self.assertEqual(1, recipe["version"])
@@ -241,7 +249,7 @@ class RecipeSourceTests(unittest.TestCase):
         def succeed(_url, _headers):
             return {"id": "recipe-4", "name": "Live", "version": 4, "definition": {"productClasses": [{"code": "BOX_GREEN"}]}}
 
-        warm = ActiveRecipeSource("http://api:5047", "device-secret", FILE_RECIPE, transport=succeed, ttl_seconds=0)
+        warm = ActiveRecipeSource("http://api:5047", FILE_RECIPE, transport=succeed, ttl_seconds=0)
         warm.resolve(None)
         warm._transport = fail
         again, again_meta = warm.resolve(None)
@@ -250,7 +258,7 @@ class RecipeSourceTests(unittest.TestCase):
         self.assertIn("offline", warm.last_error)
 
     def test_request_snapshot_wins_when_it_is_complete(self):
-        source = ActiveRecipeSource("", "", FILE_RECIPE)
+        source = ActiveRecipeSource("", FILE_RECIPE)
         recipe, meta = source.resolve({"recipeId": "abc", "recipeVersion": 7, "definition": {"productClasses": [{"code": "BOX_RED"}]}})
         self.assertEqual("request", meta["source"])
         self.assertEqual(7, recipe["version"])
@@ -333,7 +341,7 @@ class FrameEndpointPolicyTests(unittest.TestCase):
             thread.join(timeout=2)
 
     def test_inspect_uses_one_still_and_records_the_recipe_version(self):
-        source = ActiveRecipeSource("", "", FILE_RECIPE)
+        source = ActiveRecipeSource("", FILE_RECIPE)
         context, thread = self._server(None, False, source)
         port = context["port"]
         context["engine"].predict = lambda frame: {"available": True, "backend": "test", "error": None, "latencyMs": 1, "detections": []}
@@ -399,7 +407,7 @@ class FrameEndpointPolicyTests(unittest.TestCase):
             thread.join(timeout=2)
 
     def test_inspect_without_a_still_does_not_invent_a_frame(self):
-        context, thread = self._server("still_capture_failed", False, ActiveRecipeSource("", "", FILE_RECIPE))
+        context, thread = self._server("still_capture_failed", False, ActiveRecipeSource("", FILE_RECIPE))
         port = context["port"]
         request = urllib.request.Request(
             f"http://127.0.0.1:{port}/inspect",

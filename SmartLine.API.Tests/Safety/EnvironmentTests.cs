@@ -8,8 +8,8 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task High_temperature_updates_status_activates_fan_and_creates_alert()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var device = Fixture.CreateClient();
+        using var viewer = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/environment",
@@ -39,7 +39,7 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Mqtt_failure_returns_503_after_committed_environment_state_and_audit()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
         Fixture.Mqtt.FailNext();
 
         var response = await device.PostAsJsonAsync(
@@ -68,8 +68,8 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Fan_hysteresis_turns_on_above_the_upper_bound_and_off_below_the_lower_bound()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var device = Fixture.CreateClient();
+        using var viewer = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -135,7 +135,7 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
                 """
             );
         });
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/environment",

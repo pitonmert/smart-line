@@ -34,13 +34,11 @@ class ControlIntegrityTests(unittest.TestCase):
         self.assertGreater(int(pixels[0, 0, 2]), 240)
         self.assertLess(int(pixels[0, 0, 0]), 10)
 
-    def test_control_auth_body_limit_and_hardware_trigger(self):
+    def test_control_body_limit_and_hardware_trigger_without_credentials(self):
         context, thread = helpers.FrameEndpointPolicyTests()._server(None, False)
-        context['service_key'] = 'secret'
         base = f"http://127.0.0.1:{context['port']}"
-        def rejected(path, data=None, key=None, length=None):
+        def rejected(path, data=None, length=None):
             headers = {'Content-Type': 'application/json'}
-            if key: headers['X-Vision-Key'] = key
             if length: headers['Content-Length'] = str(length)
             request = urllib.request.Request(base + path, data=data, headers=headers)
             with self.assertRaises(urllib.error.HTTPError) as raised:
@@ -49,11 +47,10 @@ class ControlIntegrityTests(unittest.TestCase):
             raised.exception.close()
             return status
         try:
-            self.assertEqual(401, rejected('/frames/preview'))
-            self.assertEqual(400, rejected('/inspect', b'{', 'secret'))
-            self.assertEqual(413, rejected('/inspect', b'{}', 'secret', 70000))
-            self.assertEqual(400, rejected('/inspect', b'{"source":"hardware"}', 'secret'))
-            self.assertEqual(400, rejected('/inspect', b'{"confidence":1}', 'secret'))
+            self.assertEqual(400, rejected('/inspect', b'{'))
+            self.assertEqual(413, rejected('/inspect', b'{}', 70000))
+            self.assertEqual(400, rejected('/inspect', b'{"source":"hardware"}'))
+            self.assertEqual(400, rejected('/inspect', b'{"confidence":1}'))
         finally:
             context['server'].shutdown()
             context['server'].server_close()

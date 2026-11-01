@@ -2,12 +2,6 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 
 const recordSeparator = '\u001e'
 
-const session = {
-  accessToken: 'e2e-access-token',
-  expiresAt: '2099-01-01T00:00:00Z',
-  user: { id: 'user-1', email: 'operator@smartline.test', roles: ['Operator'] },
-}
-
 const conveyor = {
   speed: 0,
   isRunning: false,
@@ -125,30 +119,16 @@ function envelope(data: unknown, status = 200) {
   return {
     status,
     contentType: 'application/json',
-    body: JSON.stringify({ isSuccess: status < 400, message: status < 400 ? '' : 'Request was rejected.', code: status < 400 ? undefined : 'AUTHENTICATION_REQUIRED', data }),
+    body: JSON.stringify({ isSuccess: status < 400, message: status < 400 ? '' : 'Request was rejected.', code: status < 400 ? undefined : 'REQUEST_INVALID', data }),
   }
 }
 
-async function fulfillApi(route: Route, allowRefresh: boolean) {
+async function fulfillApi(route: Route) {
   const request = route.request()
+  expect(request.headers().authorization).toBeUndefined()
+  expect(new URL(request.url()).pathname.startsWith('/api/auth')).toBe(false)
   const url = new URL(request.url())
   const path = url.pathname
-  if (path === '/api/auth/refresh') {
-    await route.fulfill(allowRefresh ? envelope(session) : envelope(null, 401))
-    return
-  }
-  if (path === '/api/auth/login' && request.method() === 'POST') {
-    await route.fulfill(envelope(session))
-    return
-  }
-  if (path === '/api/auth/logout') {
-    await route.fulfill(envelope(null))
-    return
-  }
-  if (path === '/api/auth/me') {
-    await route.fulfill(envelope(session.user))
-    return
-  }
   if (path === '/api/dashboard') {
     await route.fulfill(envelope({ conveyorStatus: conveyor, todayStatistics: null, recentProducts: [], activeAlerts: [] }))
     return
@@ -190,6 +170,8 @@ function createSignalR() {
   let initialPollSent = false
   return async function fulfillSignalR(route: Route) {
     const request = route.request()
+  expect(request.headers().authorization).toBeUndefined()
+  expect(new URL(request.url()).pathname.startsWith('/api/auth')).toBe(false)
     const url = new URL(request.url())
     if (url.pathname.endsWith('/negotiate')) {
       initialPollSent = false
@@ -227,7 +209,7 @@ function createSignalR() {
   }
 }
 
-async function installBackend(page: Page, allowRefresh: boolean) {
+async function installBackend(page: Page) {
   const fulfillSignalR = createSignalR()
   await page.route('**/*', async route => {
     const url = new URL(route.request().url())
@@ -236,7 +218,7 @@ async function installBackend(page: Page, allowRefresh: boolean) {
       return
     }
     if (url.pathname.startsWith('/api/')) {
-      await fulfillApi(route, allowRefresh)
+      await fulfillApi(route)
       return
     }
     if (url.hostname === '192.168.1.50') {
@@ -259,22 +241,19 @@ function watchConsole(page: Page) {
   return errors
 }
 
-test('login page renders before a session exists', async ({ page }) => {
+test('control center opens without login or authentication requests', async ({ page }) => {
   const errors = watchConsole(page)
-  await installBackend(page, false)
+  await installBackend(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'SmartLine Dashboard' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Giriş yap' })).toBeVisible()
+  await expect(page.getByText('SIMULATION MODE')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Giriş yap' })).toHaveCount(0)
   expect(errors).toEqual([])
 })
 
-test('authenticated control center renders every main page', async ({ page }) => {
+test('control center renders every main page without credentials', async ({ page }) => {
   const errors = watchConsole(page)
-  await installBackend(page, false)
+  await installBackend(page)
   await page.goto('/')
-  await page.getByLabel('E-posta').fill('operator@smartline.test')
-  await page.getByLabel('Parola').fill('not-a-real-password')
-  await page.getByRole('button', { name: 'Giriş yap' }).click()
 
   await expect(page.getByText('SIMULATION MODE')).toBeVisible()
   await expect(page.getByText('Simulator values are on screen.')).toBeVisible()
@@ -311,7 +290,7 @@ test('authenticated control center renders every main page', async ({ page }) =>
 })
 
 test('a remotely stopped dataset session replaces the local capture result', async ({ page }) => {
-  await installBackend(page, true)
+  await installBackend(page)
   let active = true
   let captures = 0
   const dataset = { sessionId: 'session-1', recipeId: recipe.id, recipeName: 'DemoBox', status: 'ACTIVE', productClass: 'BOX_RED', qualityLabel: 'GOOD', colorLabel: 'RED', sizeLabel: 'LARGE', defectLabels: [], captureMode: 'manual', imageCount: 0, classCounts: {}, qualityCounts: {}, defectCounts: {}, recentSamples: [], startedAt: '2026-10-06T00:00:00Z', simulation: false, labelStatus: 'class-labeled' }
@@ -323,6 +302,8 @@ test('a remotely stopped dataset session replaces the local capture result', asy
   })
   await page.goto('/')
   await page.getByRole('button', { name: 'Dataset & AI' }).click()
+  await expect(page.locator('input[type="file"]')).toHaveCount(0)
+  await expect(page.getByText('Import from disk', { exact: true })).toHaveCount(0)
   const capture = page.getByTestId('dataset-capture')
   await expect(capture).toBeEnabled()
   await capture.click()
@@ -332,7 +313,7 @@ test('a remotely stopped dataset session replaces the local capture result', asy
 })
 
 test('a dataset polling failure disables capture and is visible', async ({ page }) => {
-  await installBackend(page, true)
+  await installBackend(page)
   await page.route('**/api/dataset/sessions', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ isSuccess: false, message: 'Dataset unavailable.', code: 'SERVICE_UNAVAILABLE' }) }))
   await page.goto('/')
   await page.getByRole('button', { name: 'Dataset & AI' }).click()

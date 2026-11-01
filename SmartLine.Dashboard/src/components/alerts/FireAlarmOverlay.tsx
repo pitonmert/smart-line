@@ -2,15 +2,12 @@ import { useState } from 'react'
 import { FaFire } from 'react-icons/fa'
 import { useDashboardState, useDashboardDispatch } from '../../context/DashboardContext'
 import { api, getApiErrorMessage } from '../../api/client'
-import { useAuth } from '../../auth/AuthContext'
 
 export default function FireAlarmOverlay() {
   const { activeAlerts, conveyor } = useDashboardState()
   const dispatch = useDashboardDispatch()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { hasMinimumRole } = useAuth()
-  const canResolve = hasMinimumRole('Operator')
 
   const fireAlerts = activeAlerts.filter(a => a.alertType === 'FIRE' && a.isActive)
   if (fireAlerts.length === 0) return null
@@ -39,12 +36,12 @@ export default function FireAlarmOverlay() {
           <p className="text-xs text-text-muted">
             {conveyor?.isFireDetected
               ? 'Yangın sensörü aktif; acil durum kilidi açılamaz.'
-              : 'Sensör temiz. Alarm Operator tarafından çözülebilir.'}
+              : 'Sensör temiz. Alarm çözülebilir.'}
           </p>
           {error && <p role="alert" className="mt-1 text-xs text-danger-light">{error}</p>}
         </div>
       </div>
-      {canResolve && !conveyor?.isFireDetected && (
+      {!conveyor?.isFireDetected && (
         <button
           onClick={handleResolve}
           disabled={loading}

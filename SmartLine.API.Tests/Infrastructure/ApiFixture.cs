@@ -4,10 +4,6 @@ namespace SmartLine.API.Tests.Infrastructure;
 
 public sealed class ApiFixture : IAsyncLifetime
 {
-    private const string JwtIssuer = "SmartLine.API.Tests";
-    private const string JwtAudience = "SmartLine.API.Tests.Client";
-    private static readonly string JwtSigningKey = new('j', 64);
-    private static readonly string DeviceKey = new('d', 64);
     private readonly SemaphoreSlim _databaseLock = new(1, 1);
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("smartline_tests")
@@ -41,28 +37,19 @@ public sealed class ApiFixture : IAsyncLifetime
         _databaseLock.Dispose();
     }
 
-    public HttpClient CreateAnonymousClient() => CreateClient();
+    public HttpClient CreateClient() => Factory.CreateClient(
+        new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
+        });
 
-    public HttpClient CreateUserClient(params string[] roles) =>
-        CreateClient("integration-user", roles);
+    public WebSocketClient CreateHubWebSocketClient() => Factory.Server.CreateWebSocketClient();
 
-    public HttpClient CreateDeviceClient()
+    public IsolatedApiClient CreateDashboardClient(string webRoot)
     {
-        var client = CreateClient();
-        client.DefaultRequestHeaders.Add("X-Device-Key", DeviceKey);
-        return client;
-    }
-
-    public WebSocketClient CreateHubWebSocketClient(params string[] roles)
-    {
-        var client = Factory.Server.CreateWebSocketClient();
-        if (roles.Length == 0)
-            return client;
-
-        var token = CreateAccessToken("integration-hub-user", roles);
-        client.ConfigureRequest = request =>
-            request.Headers.Authorization = $"Bearer {token}";
-        return client;
+        var factory = new SmartLineApiFactory(_postgres.GetConnectionString(), webRoot);
+        return new IsolatedApiClient(factory, factory.CreateClient());
     }
 
     public IsolatedApiClient CreateIsolatedAnonymousClient()
@@ -90,7 +77,6 @@ public sealed class ApiFixture : IAsyncLifetime
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await db.Database.EnsureDeletedAsync();
             await db.Database.MigrateAsync();
-            await SeedRolesAsync(scope.ServiceProvider);
             scope.ServiceProvider.GetService<ScriptedVisionFrames>()?.Reset();
             Mqtt.Reset();
         }
@@ -114,107 +100,15 @@ public sealed class ApiFixture : IAsyncLifetime
         await action(db);
     }
 
-    public async Task<ApplicationUser> CreateIdentityUserAsync(
-        string email,
-        string password,
-        string role
-    )
-    {
-        using var scope = Factory.Services.CreateScope();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var user = new ApplicationUser
-        {
-            Id = Guid.NewGuid(),
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true,
-            CreatedAt = DateTime.UtcNow,
-        };
-        var createResult = await users.CreateAsync(user, password);
-        Assert.True(
-            createResult.Succeeded,
-            string.Join("; ", createResult.Errors.Select(error => error.Description))
-        );
-        var roleResult = await users.AddToRoleAsync(user, role);
-        Assert.True(
-            roleResult.Succeeded,
-            string.Join("; ", roleResult.Errors.Select(error => error.Description))
-        );
-        return user;
-    }
-
-    private HttpClient CreateClient(string? username = null, IReadOnlyCollection<string>? roles = null)
-    {
-        var client = Factory.CreateClient(
-            new WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false,
-                BaseAddress = new Uri("https://localhost"),
-            }
-        );
-        if (username is null)
-            return client;
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            CreateAccessToken(username, roles ?? [])
-        );
-        return client;
-    }
-
-    private static string CreateAccessToken(
-        string username,
-        IReadOnlyCollection<string> roles
-    )
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new(ClaimTypes.Name, username),
-        };
-        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
-        var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey)),
-            SecurityAlgorithms.HmacSha256
-        );
-        var token = new JwtSecurityToken(
-            JwtIssuer,
-            JwtAudience,
-            claims,
-            notBefore: DateTime.UtcNow.AddMinutes(-1),
-            expires: DateTime.UtcNow.AddMinutes(10),
-            signingCredentials: credentials
-        );
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private static async Task SeedRolesAsync(IServiceProvider services)
-    {
-        var roles = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-        foreach (var roleName in new[] { "Viewer", "Operator", "Admin" })
-        {
-            if (!await roles.RoleExistsAsync(roleName))
-            {
-                var result = await roles.CreateAsync(new IdentityRole<Guid>(roleName));
-                Assert.True(
-                    result.Succeeded,
-                    string.Join("; ", result.Errors.Select(error => error.Description))
-                );
-            }
-        }
-    }
-
-    private sealed class SmartLineApiFactory(string connectionString)
+    private sealed class SmartLineApiFactory(string connectionString, string? webRoot = null)
         : WebApplicationFactory<global::Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
+            if (webRoot is not null)
+                builder.UseWebRoot(webRoot);
             builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
-            builder.UseSetting("Jwt:Issuer", JwtIssuer);
-            builder.UseSetting("Jwt:Audience", JwtAudience);
-            builder.UseSetting("Jwt:SigningKey", JwtSigningKey);
-            builder.UseSetting("DeviceAuthentication:Key", DeviceKey);
             builder.UseSetting("Mqtt:Username", "integration-test-api");
             builder.UseSetting("Mqtt:Password", new string('m', 64));
             builder.UseSetting("Mqtt:CaCertificatePath", "/tmp/integration-test-ca.crt");

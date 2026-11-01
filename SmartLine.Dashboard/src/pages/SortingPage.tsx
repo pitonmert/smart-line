@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import SimulationPanel from '../components/inspection/SimulationPanel'
 import { formatTime } from '../components/inspection/format'
 import { ErrorNote, Panel, SimulationBanner } from '../components/inspection/ui'
 import { usePolling } from '../hooks/usePolling'
 
 export default function SortingPage() {
-  const { hasMinimumRole } = useAuth()
   const queue = usePolling(() => api.getSortQueue(), 3000)
   const diagnostics = usePolling(() => api.getDiagnostics(), 5000)
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +41,7 @@ export default function SortingPage() {
                   <td>{item.decision}</td>
                   <td>{item.destinationBin}</td>
                   <td>{formatTime(item.sortDueAt)}</td>
-                  <td>{hasMinimumRole('Operator') && <button type="button" className="rounded bg-primary px-2 py-1 text-xs text-white" onClick={() => release(item.productId, item.publicCode)}>Release</button>}</td>
+                  <td>{<button type="button" className="rounded bg-primary px-2 py-1 text-xs text-white" onClick={() => release(item.productId, item.publicCode)}>Release</button>}</td>
                 </tr>
               ))}
             </tbody>

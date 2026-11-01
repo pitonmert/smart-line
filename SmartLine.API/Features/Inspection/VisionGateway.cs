@@ -139,7 +139,6 @@ public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<Vision
             ?? throw new ApiException(StatusCodes.Status503ServiceUnavailable, ErrorCodes.DatasetInvalid, "Vision:HealthUrl is not an absolute URL.");
         var client = factory.CreateClient("vision-capture");
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Add("X-Vision-Key", options.Value.ServiceKey);
         HttpResponseMessage response;
         try { response = await client.SendAsync(request, ct); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new ApiException(504, ErrorCodes.DatasetInvalid, "Camera capture timed out."); }

@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SmartLine.API.Domain.Inspection;
-using SmartLine.API.Infrastructure.Authentication;
 using SmartLine.API.Infrastructure.Configuration;
 using SmartLine.API.Infrastructure.Persistence;
 using SmartLine.API.Shared;
@@ -19,12 +18,12 @@ public static class VisionInspection
 
     public static IEndpointRouteBuilder MapVisionInspection(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/inspections/vision", InspectAsync).RequireAuthorization(AuthPolicies.Operator);
+        app.MapPost("/api/inspections/vision", InspectAsync);
         app.MapGet("/api/camera/preview", async (IVisionFrames frames, CancellationToken ct) =>
         {
             var frame = await frames.ReadAsync("preview", ct);
             return Results.File(frame.Jpeg, "image/jpeg");
-        }).RequireAuthorization(AuthPolicies.Viewer);
+        });
         return app;
     }
 
@@ -36,7 +35,6 @@ public static class VisionInspection
         try
         {
             using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(url), "/validate-recipe"));
-            message.Headers.Add("X-Vision-Key", options.ServiceKey);
             message.Content = new StringContent(InspectionJson.Serialize(new { recipe = new { definition = recipe } }), System.Text.Encoding.UTF8, "application/json");
             using var response = await factory.CreateClient("vision-capture").SendAsync(message, ct);
             if (!response.IsSuccessStatusCode) throw new ApiException(409, ErrorCodes.RecipeInvalid, "Recipe does not match the configured detection artifact. Restart Vision with the matching artifact.");
@@ -70,7 +68,6 @@ public static class VisionInspection
             if (url is null) throw new ApiException(503, "VISION_UNAVAILABLE", "Vision is not configured.");
             url = new Uri(new Uri(url), "/inspect").ToString();
             using var message = new HttpRequestMessage(HttpMethod.Post, url);
-            message.Headers.Add("X-Vision-Key", options.Value.ServiceKey);
             message.Content = new StringContent(JsonSerializer.Serialize(new { source = "api", recipe = new { id = recipe.Id, version = recipe.Version, definition }, calibration }, InspectionJson.Options), System.Text.Encoding.UTF8, "application/json");
             using var response = await factory.CreateClient("vision-capture").SendAsync(message, ct);
             if (!response.IsSuccessStatusCode)

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { FaTimes } from 'react-icons/fa'
 import { useDashboardState, useDashboardDispatch } from '../../context/DashboardContext'
 import { api, getApiErrorMessage } from '../../api/client'
-import { useAuth } from '../../auth/AuthContext'
 
 const alertLabels: Record<string, string> = {
   EMERGENCY_STOP: 'Acil Durdurma',
@@ -15,8 +14,6 @@ export default function AlertsPanel({ open, onClose }: { open: boolean; onClose:
   const dispatch = useDashboardDispatch()
   const [resolvingId, setResolvingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { hasMinimumRole } = useAuth()
-  const canResolve = hasMinimumRole('Operator')
 
   const panelAlerts = activeAlerts.filter(a => a.alertType !== 'FIRE')
 
@@ -66,7 +63,7 @@ export default function AlertsPanel({ open, onClose }: { open: boolean; onClose:
                       {new Date(alert.triggeredAt).toLocaleTimeString('tr-TR')}
                     </span>
                   </div>
-                  {canResolve && (
+                  {(
                     <button
                       onClick={() => handleResolve(alert.id)}
                       disabled={resolvingId === alert.id}

@@ -8,7 +8,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Duplicate_barcode_returns_conflict_and_does_not_increment_statistics_twice()
     {
-        using var client = Fixture.CreateDeviceClient();
+        using var client = Fixture.CreateClient();
         var payload = new { barcode = "DUPLICATE-001", color = "RED" };
 
         var first = await client.PostAsJsonAsync("/api/sensors/barcode", payload);
@@ -41,7 +41,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Concurrent_duplicate_barcode_allows_exactly_one_product()
     {
-        using var client = Fixture.CreateDeviceClient();
+        using var client = Fixture.CreateClient();
         const string barcode = "CONCURRENT-001";
 
         var requests = Enumerable
@@ -82,7 +82,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Comma_separated_color_value_is_rejected_instead_of_matching_a_flag_combination()
     {
-        using var client = Fixture.CreateDeviceClient();
+        using var client = Fixture.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/sensors/barcode",
@@ -95,7 +95,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Empty_barcode_creates_a_no_barcode_product_and_alert_atomically()
     {
-        using var client = Fixture.CreateDeviceClient();
+        using var client = Fixture.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/sensors/barcode",

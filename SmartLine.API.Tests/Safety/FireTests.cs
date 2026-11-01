@@ -11,8 +11,8 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Repeated_fire_signal_is_idempotent_and_keeps_the_conveyor_emergency_stopped()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var device = Fixture.CreateClient();
+        using var viewer = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -52,9 +52,9 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Fire_clear_then_admin_reset_requires_an_explicit_start()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var admin = Fixture.CreateUserClient("Admin");
-        using var operatorClient = Fixture.CreateUserClient("Operator");
+        using var device = Fixture.CreateClient();
+        using var admin = Fixture.CreateClient();
+        using var operatorClient = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -103,8 +103,8 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Offline_fire_generation_requires_a_new_admin_reset_that_acknowledges_it()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var admin = Fixture.CreateUserClient("Admin");
+        using var device = Fixture.CreateClient();
+        using var admin = Fixture.CreateClient();
 
         await AssertSuccessAsync(await admin.PostAsync("/api/conveyor/emergency-reset", null));
         Assert.Contains(
@@ -165,8 +165,8 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task First_device_epoch_commissions_fail_safe_until_admin_acknowledges_it()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var admin = Fixture.CreateUserClient("Admin");
+        using var device = Fixture.CreateClient();
+        using var admin = Fixture.CreateClient();
 
         var reading = await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -202,8 +202,8 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task New_epoch_after_nvs_erase_relatches_even_when_sensor_is_clear()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var admin = Fixture.CreateUserClient("Admin");
+        using var device = Fixture.CreateClient();
+        using var admin = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -243,9 +243,9 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Same_epoch_generation_rollback_faults_closed_and_blocks_reset_and_start()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var admin = Fixture.CreateUserClient("Admin");
-        using var operatorClient = Fixture.CreateUserClient("Operator");
+        using var device = Fixture.CreateClient();
+        using var admin = Fixture.CreateClient();
+        using var operatorClient = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -294,7 +294,7 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Replayed_fire_identity_after_clear_relatches_without_duplicate_audit()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await device.PostAsJsonAsync(
@@ -350,7 +350,7 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [InlineData("gggggggggggggggggggggggggggggggg")]
     public async Task Invalid_device_epoch_is_rejected(string? deviceEpoch)
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/fire",
@@ -368,7 +368,7 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Missing_fire_generation_is_rejected_instead_of_defaulting_to_zero()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/fire",
@@ -381,7 +381,7 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Missing_device_epoch_is_rejected()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/fire",
@@ -394,7 +394,7 @@ public sealed class FireTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Missing_is_detected_is_rejected()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
 
         var response = await device.PostAsJsonAsync(
             "/api/sensors/fire",

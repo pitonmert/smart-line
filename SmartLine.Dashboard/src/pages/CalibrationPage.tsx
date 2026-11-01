@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import { fieldClass } from '../components/inspection/format'
 import { ErrorNote, Panel, SimulationBanner } from '../components/inspection/ui'
 import { usePolling } from '../hooks/usePolling'
@@ -14,7 +13,6 @@ function optionalNumber(value: FormDataEntryValue | null) {
 }
 
 export default function CalibrationPage() {
-  const { hasMinimumRole } = useAuth()
   const profiles = usePolling(() => api.getCalibrationProfiles(), 8000)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -64,13 +62,13 @@ export default function CalibrationPage() {
           {(profiles.data ?? []).map(item => (
             <li key={item.id} className="flex items-center justify-between gap-3 border-b border-card-border py-2">
               <span>{item.name} v{item.version} {item.isActive && <span className="text-success-light">active</span>} {item.simulationDataPresent && <span className="text-warning-light">SIMULATION</span>}</span>
-              {hasMinimumRole('Operator') && !item.isActive && <button type="button" className="rounded bg-primary px-2 py-1 text-xs text-white" onClick={async () => { try { await api.activateCalibrationProfile(item.id); profiles.reload() } catch (reason) { setError(getApiErrorMessage(reason, 'Profile was not activated.')) } }}>Activate</button>}
+              {!item.isActive && <button type="button" className="rounded bg-primary px-2 py-1 text-xs text-white" onClick={async () => { try { await api.activateCalibrationProfile(item.id); profiles.reload() } catch (reason) { setError(getApiErrorMessage(reason, 'Profile was not activated.')) } }}>Activate</button>}
             </li>
           ))}
           {profiles.data && profiles.data.length === 0 && <li className="text-text-muted">No calibration profile is stored.</li>}
         </ul>
       </Panel>
-      {hasMinimumRole('Operator') && (
+      {(
         <Panel title="New profile">
           <form className="grid grid-cols-1 gap-3 md:grid-cols-3" onSubmit={save}>
             <input name="name" required placeholder="Name" className={fieldClass} />

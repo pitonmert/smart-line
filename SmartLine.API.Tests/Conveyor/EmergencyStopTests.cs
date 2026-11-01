@@ -8,7 +8,7 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Normal_stop_does_not_set_the_emergency_latch()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
 
         var response = await client.PostAsync("/api/conveyor/stop", null);
         var status = await AssertSuccessAsync(response);
@@ -33,7 +33,7 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Emergency_stop_latches_state_and_uses_the_dedicated_mqtt_command()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
 
         var response = await client.PostAsync("/api/conveyor/emergency-stop", null);
         var status = await AssertSuccessAsync(response);
@@ -63,7 +63,7 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Start_is_rejected_while_emergency_stop_is_latched()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
         await AssertSuccessAsync(await client.PostAsync("/api/conveyor/emergency-stop", null));
 
         var response = await client.PostAsync("/api/conveyor/start", null);
@@ -72,21 +72,21 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     }
 
     [Fact]
-    public async Task Emergency_reset_requires_admin()
+    public async Task Emergency_reset_does_not_require_an_account()
     {
-        using var operatorClient = Fixture.CreateUserClient("Operator");
+        using var operatorClient = Fixture.CreateClient();
 
         var response = await operatorClient.PostAsync("/api/conveyor/emergency-reset", null);
 
-        await AssertErrorAsync(response, HttpStatusCode.Forbidden, "ACCESS_DENIED");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task Emergency_reset_is_blocked_while_fire_sensor_is_active()
     {
-        using var operatorClient = Fixture.CreateUserClient("Operator");
-        using var adminClient = Fixture.CreateUserClient("Admin");
-        using var deviceClient = Fixture.CreateDeviceClient();
+        using var operatorClient = Fixture.CreateClient();
+        using var adminClient = Fixture.CreateClient();
+        using var deviceClient = Fixture.CreateClient();
         await AssertSuccessAsync(
             await operatorClient.PostAsync("/api/conveyor/emergency-stop", null)
         );
@@ -110,9 +110,9 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Admin_can_reset_after_fire_sensor_clears_without_starting_the_conveyor()
     {
-        using var operatorClient = Fixture.CreateUserClient("Operator");
-        using var adminClient = Fixture.CreateUserClient("Admin");
-        using var deviceClient = Fixture.CreateDeviceClient();
+        using var operatorClient = Fixture.CreateClient();
+        using var adminClient = Fixture.CreateClient();
+        using var deviceClient = Fixture.CreateClient();
         await AssertSuccessAsync(
             await operatorClient.PostAsync("/api/conveyor/emergency-stop", null)
         );
@@ -157,7 +157,7 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Mqtt_failure_returns_a_stable_service_unavailable_error()
     {
-        using var client = Fixture.CreateUserClient("Operator");
+        using var client = Fixture.CreateClient();
         Fixture.Mqtt.FailNext();
 
         var response = await client.PostAsync("/api/conveyor/emergency-stop", null);
@@ -168,8 +168,8 @@ public sealed class EmergencyStopTests(ApiFixture fixture) : ApiTestBase(fixture
     [Fact]
     public async Task Every_admin_reset_advances_the_monotonic_reset_generation()
     {
-        using var operatorClient = Fixture.CreateUserClient("Operator");
-        using var adminClient = Fixture.CreateUserClient("Admin");
+        using var operatorClient = Fixture.CreateClient();
+        using var adminClient = Fixture.CreateClient();
 
         await AssertSuccessAsync(
             await operatorClient.PostAsync("/api/conveyor/emergency-stop", null)

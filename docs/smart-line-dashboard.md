@@ -9,9 +9,7 @@ Kamera paneli MJPEG görüntüsünü `object-fit: contain` ile doldurur. Çözü
 ```text
 SmartLine.Dashboard/src/
 ├── api/client.ts
-├── auth/AuthContext.tsx
 ├── components/
-│   ├── auth/
 │   ├── conveyor/
 │   ├── gauges/
 │   ├── charts/
@@ -29,37 +27,13 @@ SmartLine.Dashboard/src/
 └── main.tsx
 ```
 
-## Auth yaşam döngüsü
+## Direct access
 
-Dashboard public registration sağlamaz. Kullanıcı `POST /api/auth/login` ile oturum açar.
-
-```text
-Login
-  -> access token yalnız JavaScript belleğinde
-  -> refresh token HttpOnly/Secure/SameSite=Strict cookie'de
-  -> REST Authorization: Bearer <access token>
-  -> SignalR accessTokenFactory aynı token kaynağını kullanır
-```
-
-Access token `localStorage` veya `sessionStorage` içine yazılmaz. Sayfa yenilendiğinde bellek boş olduğu için `POST /api/auth/refresh` çağrılır; geçerli cookie varsa yeni access token alınır. API isteği 401 döndürürse tek kontrollü refresh yapılır ve istek bir kez tekrar edilir. Eşzamanlı refresh'ler ortak promise ile birleştirilir.
-
-Logout endpoint'i server-side refresh kaydını revoke eder ve cookie'yi siler; hata olsa bile yerel bellek oturumu temizlenir.
-
-## Rol bazlı arayüz
-
-| Rol      | Dashboard davranışı                                                          |
-| -------- | ---------------------------------------------------------------------------- |
-| Viewer   | Dashboard/alarmlar/loglar/istatistikler salt okunur; conveyor kontrolü gizli |
-| Operator | Hız, start, normal stop, emergency-stop ve alarm resolve kontrolleri görünür |
-| Admin    | Operator yetkilerine ek olarak emergency latch reset görünür                 |
-
-Emergency reset butonu fire sensörü aktifken disabled olur. Reset yalnız latch'i açar; konveyör kendiliğinden başlamaz. Emergency-stop için kullanıcıdan ayrıca onay alınır.
-
-Frontend rol kontrolü güvenlik sınırı değildir; API aynı işlemleri server-side policy ile tekrar doğrular.
+The control center opens immediately without login or session restoration. There are no users, roles, token refresh requests or logout controls. All actions are visible; operation-specific conditions still apply. Emergency reset remains disabled while a fire or generation fault is active, and it does not automatically restart the conveyor.
 
 ## API client ve hata davranışı
 
-Tüm istekler relative `/api` yolunu ve `credentials: include` kullanır. Success/failure envelope tipi:
+Tüm istekler relative `/api` yolunu kullanır. Success/failure envelope tipi:
 
 ```ts
 interface ApiResponse<T> {
@@ -80,11 +54,11 @@ Dashboard'un kullandığı ana REST çağrıları:
 - `POST /api/alerts/{id}/resolve`
 - Development simulator için sensor POST endpoint'leri
 
-`ConveyorStatusDto`, `isEmergencyStopped`, `isFireDetected`, `fireDeviceEpoch`, `lastFireGeneration` ve `isFireGenerationFault` alanlarını içerir. UI herhangi bir safety interlock aktifken start ve speed kontrollerini kapatır; generation fault durumunda cihazın yeniden provision edilmesi gerektiğini gösterir ve Admin reset'i de devre dışı bırakır.
+`ConveyorStatusDto`, `isEmergencyStopped`, `isFireDetected`, `fireDeviceEpoch`, `lastFireGeneration` ve `isFireGenerationFault` alanlarını içerir. UI herhangi bir safety interlock aktifken start ve speed kontrollerini kapatır; generation fault durumunda cihazın yeniden provision edilmesi gerektiğini gösterir ve manual reset'i de devre dışı bırakır.
 
 ## Realtime akışı
 
-`useSignalR`, `/hubs/dashboard` bağlantısını `accessTokenFactory` ile açar ve otomatik reconnect aralıklarını `0`, `2`, `5`, `10` saniye olarak ayarlar.
+`useSignalR`, `/hubs/dashboard` bağlantısını without an access token açar ve otomatik reconnect aralıklarını `0`, `2`, `5`, `10` saniye olarak ayarlar.
 
 | SignalR event              | State etkisi                    |
 | -------------------------- | ------------------------------- |
@@ -98,24 +72,23 @@ Bağlantı yeniden kurulduğunda `GET /api/dashboard` ile snapshot tekrar alın�
 
 ## Ekran bileşenleri
 
-- `LoginPage`: e-posta/parola formu ve code-aware hata gösterimi.
-- `ConveyorCard`: hız, running, emergency/fire state ve rol bazlı kontrol.
-- `EmergencyStop`: normal stop ile emergency-stop'u ayrı çağırır; Admin reset ayrıdır.
+- `ConveyorCard`: hız, running, emergency/fire state ve operational controls.
+- `EmergencyStop`: normal stop ile emergency-stop'u ayrı çağırır; manual reset ayrıdır.
 - `EnvironmentPanel`: sıcaklık/nem/fan görünümü.
 - `ProductionAndProducts`: canlı/saatlik üretim ve son ürünler.
-- `AlertsPanel` ve `FireAlarmOverlay`: aktif alarm görünümü ve Operator resolve.
+- `AlertsPanel` ve `FireAlarmOverlay`: aktif alarm görünümü ve alarm resolution.
 - `LiveLogFeed`: SignalR log akışı.
-- `Header`: kullanıcı/roller, SignalR/cihaz durumu ve logout.
+- `Header`: SignalR/device connection state and clock.
 
 ## Development simulator paneli
 
 Browser tabanlı sensor simulator yalnız şu iki koşulda render edilir:
 
 ```text
-import.meta.env.DEV && role >= Operator
+import.meta.env.DEV
 ```
 
-Production bundle'da panel görünmez. Sensor POST endpoint'leri yalnız Device authentication kabul ettiği için development Vite proxy, `SMARTLINE_DEVICE_KEY` process environment değerini server-side `X-Device-Key` header'ına ekler. Bu değer `VITE_` prefix'i taşımaz ve frontend bundle'a gömülmez. Fire simulator, 32 karakterlik rastgele development `deviceEpoch` ve monoton `fireGeneration` değerini browser `localStorage` içinde korur; rising-edge yeni generation üretir, clear aynı generation'ı gönderir.
+Production bundle'da panel görünmez. Sensor HTTP requests do not require credentials. Fire simulator, 32 karakterlik rastgele development `deviceEpoch` ve monoton `fireGeneration` değerini browser `localStorage` içinde korur; rising-edge yeni generation üretir, clear aynı generation'ı gönderir.
 
 Lokal çalıştırma:
 
@@ -123,7 +96,6 @@ Lokal çalıştırma:
 cd SmartLine.Dashboard
 npm ci
 API_TARGET=http://localhost:5047 \
-SMARTLINE_DEVICE_KEY='<development-device-key>' \
 npm run dev
 ```
 
@@ -138,18 +110,29 @@ npm run build
 npm run e2e
 ```
 
-`npm run e2e` Playwright ile production preview üzerinde login, on ana sayfa, kamera paneli, simülasyon bandı ve dataset yakalama düğmesini route mock'larıyla doğrular. Üretim kimlik doğrulaması gevşetilmez. Trace ve ekran görüntüleri üretilen dosyalardır.
+`npm run e2e` Playwright ile production preview üzerinde direct startup, on ana sayfa, kamera paneli, simülasyon bandı ve dataset yakalama düğmesini route mock'larıyla doğrular. No authentication requests or bearer headers are sent. Trace ve ekran görüntüleri üretilen dosyalardır.
 
-Production static build, `infra/caddy/Dockerfile` içindeki Node build stage'inde oluşturulur. Caddy `https://smartline.local` üzerinden static dosyaları sunar ve `/api`, `/hubs`, `/health` yollarını API container'ına proxy eder. Browser ile API aynı origin'dedir.
+The production Dashboard is built by the Node stage in `SmartLine.API/Dockerfile` and copied into the API image's `wwwroot`. ASP.NET Core serves it directly at `https://smartline.local`, alongside `/api`, `/hubs` and `/health`. Browser navigation routes return `index.html`; unknown API/hub routes and missing assets remain 404. Vite remains the development server with its local API/WebSocket forwarding.
+
+To serve the built Dashboard from a local API checkout instead of Vite, run from the repository root:
+
+```sh
+npm --prefix SmartLine.Dashboard run build
+mkdir -p SmartLine.API/wwwroot
+cp -R SmartLine.Dashboard/dist/. SmartLine.API/wwwroot/
+```
+
+The generated `wwwroot` directory is ignored by Git. Start the API with its usual local database and MQTT settings, then open its configured URL. Docker production builds perform the Dashboard build and copy automatically. Do not put secrets or dataset files in `wwwroot`: everything there is public.
 
 Production kurulumu ve yerel CA trust adımları için [deployment.md](deployment.md) kullanılır.
 
 ## Dataset toplama
 
-Dataset & AI sayfası canlı MJPEG önizlemeyi gösterir ve `Capture from camera` ile sunucudan bir JPEG ister. Tarayıcı, cross-origin MJPEG öğesinin piksellerini okumaz. API, Vision `GET /frames/dataset` karesini tek dosya olarak dataset oturumuna yazar. Ürün sınıfı, renk, boyut ve kusur seçenekleri aktif Product Recipe listelerinden gelir. Kalite `GOOD` veya `DEFECTIVE` olur. Aralık yakalama aynı kamera uç noktasını, ekrandaki güncel etiketlerle çağırır. Küçük resimler access token bellekte olduğu için `Authorization` başlığıyla alınır ve blob URL olarak gösterilir. Diskten JPEG/PNG seçmek ikincil içe aktarmadır. Ham görüntüler Git'e girmez.
+Dataset & AI sayfası canlı MJPEG önizlemeyi gösterir ve `Capture from camera` ile sunucudan bir JPEG ister. Tarayıcı, cross-origin MJPEG öğesinin piksellerini okumaz. API, Vision `GET /frames/dataset` karesini tek dosya olarak dataset oturumuna yazar. Ürün sınıfı, renk, boyut ve kusur seçenekleri aktif Product Recipe listelerinden gelir. Kalite `GOOD` veya `DEFECTIVE` olur. Aralık yakalama aynı kamera uç noktasını, ekrandaki güncel etiketlerle çağırır. Thumbnails are fetched directly and displayed as blob URLs. Ham görüntüler Git'e girmez.
+
+Dataset collection uses camera capture only, manually or at the configured interval. There is no file picker or disk import action. Existing image viewing, session controls, and sample discard remain available.
 
 ## Sınırlar
 
-- Access token bellek içi olduğu için sayfa yenileme geçerli refresh cookie gerektirir; bu beklenen davranıştır.
 - UI'nın connected göstergesi safety kanıtı değildir. Fiziksel safety relay/hardwired E-stop ayrı zorunluluktur.
 - Production tek API instance varsayar; SignalR backplane yoktur.

@@ -10,9 +10,7 @@ export function useSignalR() {
 
   useEffect(() => {
     const connection = new HubConnectionBuilder()
-      .withUrl('/hubs/dashboard', {
-        accessTokenFactory: () => api.getAccessTokenForConnection(),
-      })
+      .withUrl('/hubs/dashboard')
       .withAutomaticReconnect([0, 2000, 5000, 10000])
       .configureLogging(LogLevel.Warning)
       .build()

@@ -8,8 +8,8 @@ public sealed class StatisticsTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Barcode_ingestion_updates_daily_and_hourly_statistics_once()
     {
-        using var device = Fixture.CreateDeviceClient();
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var device = Fixture.CreateClient();
+        using var viewer = Fixture.CreateClient();
 
         var red = await device.PostAsJsonAsync(
             "/api/sensors/barcode",
@@ -41,7 +41,7 @@ public sealed class StatisticsTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Daily_statistics_reject_a_range_longer_than_366_days()
     {
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var viewer = Fixture.CreateClient();
 
         var response = await viewer.GetAsync(
             "/api/statistics/daily?startDate=2024-01-01&endDate=2025-01-02"
@@ -72,7 +72,7 @@ public sealed class StatisticsTests(ApiFixture fixture) : ApiTestBase(fixture)
             );
             await db.SaveChangesAsync();
         });
-        using var viewer = Fixture.CreateUserClient("Viewer");
+        using var viewer = Fixture.CreateClient();
 
         var response = await viewer.GetAsync(
             $"/api/statistics/daily?startDate={date:yyyy-MM-dd}&endDate={date:yyyy-MM-dd}"
@@ -87,7 +87,7 @@ public sealed class StatisticsTests(ApiFixture fixture) : ApiTestBase(fixture)
     [Fact]
     public async Task Concurrent_ingestion_keeps_one_daily_and_one_hourly_row()
     {
-        using var device = Fixture.CreateDeviceClient();
+        using var device = Fixture.CreateClient();
         var requests = Enumerable
             .Range(1, 12)
             .Select(index =>

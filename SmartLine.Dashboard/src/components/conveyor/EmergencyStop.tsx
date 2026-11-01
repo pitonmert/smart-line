@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { FaExclamationTriangle, FaPause, FaPlay, FaUndo } from 'react-icons/fa'
 import { api, getApiErrorMessage } from '../../api/client'
 import { useDashboardDispatch } from '../../context/DashboardContext'
-import { useAuth } from '../../auth/AuthContext'
 
 interface Props {
   isRunning: boolean
@@ -17,9 +16,6 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
   const [loading, setLoading] = useState<Action | null>(null)
   const [error, setError] = useState<string | null>(null)
   const dispatch = useDashboardDispatch()
-  const { hasMinimumRole } = useAuth()
-  const canOperate = hasMinimumRole('Operator')
-  const canReset = hasMinimumRole('Admin')
 
   const run = async (action: Action) => {
     if (action === 'emergency-stop' && !confirm('ACİL DURDURMA kilidini etkinleştirmek istediğinize emin misiniz?')) return
@@ -41,11 +37,6 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
     }
   }
 
-  if (!canOperate) {
-    return (
-      <span className="text-xs text-text-muted">Salt okunur</span>
-    )
-  }
 
   return (
     <div className="flex max-w-[15rem] flex-col items-end gap-2">
@@ -79,7 +70,7 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
           {loading === 'emergency-stop' ? 'Durduruluyor...' : 'Acil durdur'}
         </button>
 
-        {isEmergencyStopped && canReset && (
+        {isEmergencyStopped && (
           <button
             onClick={() => run('emergency-reset')}
             disabled={loading !== null || isFireDetected || isFireGenerationFault}
@@ -98,9 +89,6 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
         )}
       </div>
       {error && <p role="alert" className="text-right text-xs text-danger-light">{error}</p>}
-      {isEmergencyStopped && !canReset && (
-        <p className="text-right text-xs text-text-muted">Kilidi yalnız Admin açabilir.</p>
-      )}
     </div>
   )
 }

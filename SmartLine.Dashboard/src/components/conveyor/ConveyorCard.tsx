@@ -2,11 +2,9 @@ import { FaPlay, FaPause, FaFan } from 'react-icons/fa'
 import { useDashboardState } from '../../context/DashboardContext'
 import SpeedSlider from './SpeedSlider'
 import EmergencyStop from './EmergencyStop'
-import { useAuth } from '../../auth/AuthContext'
 
 export default function ConveyorCard() {
   const { conveyor } = useDashboardState()
-  const { hasMinimumRole } = useAuth()
 
   if (!conveyor) {
     return (
@@ -45,7 +43,6 @@ export default function ConveyorCard() {
             currentSpeed={conveyor.speed}
             isRunning={conveyor.isRunning}
             isEmergencyStopped={conveyor.isEmergencyStopped}
-            canControl={hasMinimumRole('Operator')}
           />
         </div>
       </div>

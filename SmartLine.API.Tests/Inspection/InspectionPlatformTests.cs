@@ -10,24 +10,22 @@ namespace SmartLine.API.Tests.Inspection;
 public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fixture)
 {
     [Fact]
-    public async Task RecipesRequireAuthentication()
+    public async Task RecipesAreAvailableWithoutAuthentication()
     {
-        var response = await Fixture.CreateAnonymousClient().GetAsync("/api/recipes");
-        await AssertErrorAsync(response, HttpStatusCode.Unauthorized, ErrorCodes.AuthenticationRequired);
+        var response = await Fixture.CreateClient().GetAsync("/api/recipes");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task DemoBoxIsSeededAndInvalidRecipesAreRejected()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var viewer = Fixture.CreateUserClient("Viewer");
+        var viewer = Fixture.CreateClient();
         var recipes = await AssertSuccessAsync(await viewer.GetAsync("/api/recipes"));
         Assert.Equal("DemoBox", recipes.EnumerateArray().Single().GetProperty("name").GetString());
 
-        var denied = await viewer.PostAsJsonAsync("/api/simulation/arrivals", new { confidence = 0.9 });
-        await AssertErrorAsync(denied, HttpStatusCode.Forbidden, ErrorCodes.AccessDenied);
 
-        var invalid = await Fixture.CreateUserClient("Operator").PostAsJsonAsync(
+        var invalid = await Fixture.CreateClient().PostAsJsonAsync(
             "/api/recipes",
             new { name = "Broken", definition = new { name = "Broken", productClasses = Array.Empty<object>(), destinationBins = Array.Empty<object>() } }
         );
@@ -38,7 +36,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task SimulationArrivalIsMarkedAndDoesNotCommandActuators()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var created = await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/simulation/arrivals",
@@ -90,7 +88,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
         var created = await AssertSuccessAsync(
-            await Fixture.CreateDeviceClient().PostAsJsonAsync(
+            await Fixture.CreateClient().PostAsJsonAsync(
                 "/api/inspections",
                 new
                 {
@@ -122,23 +120,20 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     }
 
     [Fact]
-    public async Task DeviceReadsTheActiveRecipeSnapshotAndAViewerDoesNot()
+    public async Task ActiveRecipeSnapshotIsAvailableWithoutDeviceKey()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var device = await AssertSuccessAsync(await Fixture.CreateDeviceClient().GetAsync("/api/recipes/active/snapshot"));
+        var device = await AssertSuccessAsync(await Fixture.CreateClient().GetAsync("/api/recipes/active/snapshot"));
         Assert.Equal("DemoBox", device.GetProperty("name").GetString());
         Assert.True(device.GetProperty("version").GetInt32() >= 1);
         Assert.True(device.GetProperty("definition").GetProperty("productClasses").GetArrayLength() > 0);
 
-        var viewer = await Fixture.CreateUserClient("Viewer").GetAsync("/api/recipes/active/snapshot");
-        Assert.NotEqual(HttpStatusCode.OK, viewer.StatusCode);
-        await AssertErrorAsync(viewer, HttpStatusCode.Unauthorized, "AUTHENTICATION_REQUIRED");
     }
 
     [Fact]
     public async Task CalibrationRejectsHardwareTimeOfFlightAndEnabledGates()
     {
-        var response = await Fixture.CreateUserClient("Operator").PostAsJsonAsync(
+        var response = await Fixture.CreateClient().PostAsJsonAsync(
             "/api/calibration-profiles",
             new
             {
@@ -159,7 +154,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task DatasetCaptureStoresAnUnannotatedImage()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var started = await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/dataset/sessions",
@@ -176,19 +171,22 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
             HttpStatusCode.Created
         );
         var sessionId = started.GetProperty("sessionId").GetGuid();
-        using var content = new MultipartFormDataContent();
-        var image = new ByteArrayContent(TestImages.Jpeg());
-        image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-        content.Add(image, "image", "sample.jpg");
-        var captured = await AssertSuccessAsync(await client.PostAsync($"/api/dataset/sessions/{sessionId}/captures", content));
-        Assert.Equal(1, captured.GetProperty("imageCount").GetInt32());
-        Assert.Equal(1, captured.GetProperty("classCounts").GetProperty("BOX_BLUE").GetInt32());
-        Assert.Contains("not inferred", captured.GetProperty("labelStatus").GetString(), StringComparison.Ordinal);
+        var frames = Fixture.GetRequiredService<ScriptedVisionFrames>();
+        frames.Jpeg = TestImages.Jpeg();
+        var captured = await AssertSuccessAsync(await client.PostAsJsonAsync($"/api/dataset/sessions/{sessionId}/captures/camera", new { productClass = "BOX_BLUE", qualityLabel = "GOOD", colorLabel = "BLUE", sizeLabel = "MEDIUM" }));
+        var session = captured.GetProperty("session");
+        Assert.Equal(1, session.GetProperty("imageCount").GetInt32());
+        Assert.Equal(1, session.GetProperty("classCounts").GetProperty("BOX_BLUE").GetInt32());
+        Assert.Contains("not inferred", session.GetProperty("labelStatus").GetString(), StringComparison.Ordinal);
+        var path = await Fixture.WithDbContextAsync(db => db.DatasetSessions.Where(item => item.Id == sessionId).Select(item => item.StoragePath).SingleAsync());
+        var entry = InspectionJson.Deserialize<DatasetManifestEntry>(File.ReadAllLines(Path.Combine(path, "manifest.jsonl")).Single());
+        Assert.False(entry.Annotated);
+        Assert.Empty(entry.BoundingBoxes);
 
-        var corrupt = new MultipartFormDataContent();
-        corrupt.Add(new ByteArrayContent([1, 2, 3, 4]), "image", "bad.jpg");
-        var rejected = await client.PostAsync($"/api/dataset/sessions/{sessionId}/captures", corrupt);
+        frames.Jpeg = [1, 2, 3, 4];
+        var rejected = await client.PostAsJsonAsync($"/api/dataset/sessions/{sessionId}/captures/camera", new { productClass = "BOX_BLUE", qualityLabel = "GOOD", colorLabel = "BLUE", sizeLabel = "MEDIUM" });
         await AssertErrorAsync(rejected, HttpStatusCode.BadRequest, ErrorCodes.DatasetInvalid);
+        Assert.Equal(1, await Fixture.WithDbContextAsync(db => db.DatasetSessions.Where(item => item.Id == sessionId).Select(item => item.ImageCount).SingleAsync()));
     }
 
     [Fact]
@@ -198,7 +196,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
         var frames = Fixture.GetRequiredService<ScriptedVisionFrames>();
         frames.FailStill = false;
         frames.Jpeg = TestImages.Jpeg();
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var started = await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/dataset/sessions",
@@ -268,7 +266,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task CameraCaptureWithoutVisionIsRejected()
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var started = await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/dataset/sessions",
@@ -301,7 +299,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
         frames.Jpeg = TestImages.Jpeg();
         try
         {
-        var client = Fixture.CreateUserClient("Operator");
+        var client = Fixture.CreateClient();
         var started = await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/dataset/sessions",
@@ -355,7 +353,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
             await ContractSeeder.EnsureAsync(db);
         });
 
-        var recipes = await AssertSuccessAsync(await Fixture.CreateUserClient("Viewer").GetAsync("/api/recipes"));
+        var recipes = await AssertSuccessAsync(await Fixture.CreateClient().GetAsync("/api/recipes"));
         var demo = recipes.EnumerateArray().Single(item => item.GetProperty("name").GetString() == "DemoBox");
         Assert.Equal(240, demo.GetProperty("definition").GetProperty("cameraProfile").GetProperty("sourceWidth").GetInt32());
         Assert.Equal(176, demo.GetProperty("definition").GetProperty("cameraProfile").GetProperty("sourceHeight").GetInt32());
@@ -385,7 +383,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
             await ContractSeeder.EnsureAsync(db);
         });
 
-        var recipes = await AssertSuccessAsync(await Fixture.CreateUserClient("Viewer").GetAsync("/api/recipes"));
+        var recipes = await AssertSuccessAsync(await Fixture.CreateClient().GetAsync("/api/recipes"));
         var demo = recipes.EnumerateArray().Single(item => item.GetProperty("name").GetString() == "DemoBox");
         Assert.Equal(320, demo.GetProperty("definition").GetProperty("cameraProfile").GetProperty("sourceWidth").GetInt32());
         Assert.Equal(4, demo.GetProperty("version").GetInt32());
@@ -395,7 +393,7 @@ public sealed class InspectionPlatformTests(ApiFixture fixture) : ApiTestBase(fi
     [Fact]
     public async Task DiagnosticsDoesNotExposeSecrets()
     {
-        var data = await AssertSuccessAsync(await Fixture.CreateUserClient("Viewer").GetAsync("/api/diagnostics"));
+        var data = await AssertSuccessAsync(await Fixture.CreateClient().GetAsync("/api/diagnostics"));
         var json = data.GetRawText();
         Assert.Equal("not_loaded", data.GetProperty("modelStatus").GetString());
         Assert.Equal("NOT_CONFIGURED", data.GetProperty("vision").GetString());

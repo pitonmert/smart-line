@@ -19,14 +19,12 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, Environment = { ["SMARTLINE_TEST_CAPTURE_DELAY"] = "3.2" } })!;
         var options = Fixture.GetRequiredService<IOptions<VisionEndpointOptions>>().Value;
         var oldUrl = options.HealthUrl;
-        var oldKey = options.ServiceKey;
         try
         {
             var port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
             Assert.True(int.TryParse(port, out _), "Vision server did not return a port.");
             options.HealthUrl = $"http://127.0.0.1:{port}/health";
-            options.ServiceKey = "test-key";
-            var client = Fixture.CreateUserClient("Operator");
+            var client = Fixture.CreateClient();
             var id = Guid.NewGuid();
             var initial = await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = id });
             Assert.True(initial.StatusCode == HttpStatusCode.Created, await initial.Content.ReadAsStringAsync());
@@ -35,13 +33,11 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
             var again = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = id }));
             Assert.Equal(id, again.GetProperty("inspection").GetProperty("inspectionId").GetGuid());
             Assert.Equal(1, await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync()));
-            options.ServiceKey = "wrong";
-            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = Guid.NewGuid() })).StatusCode);
             Assert.Equal(1, await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync()));
         }
         finally
         {
-            options.HealthUrl = oldUrl; options.ServiceKey = oldKey;
+            options.HealthUrl = oldUrl;
             if (!server.HasExited) server.Kill(true);
             await server.WaitForExitAsync();
         }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import CameraStage from '../components/camera/CameraStage'
 import { fieldClass, formatTime, healthTone } from '../components/inspection/format'
 import { ErrorNote, Panel, SimulationBanner, StatusPill } from '../components/inspection/ui'
@@ -45,8 +44,6 @@ function labelsFromSession(session: DatasetSession): Labels {
 }
 
 export default function DatasetPage() {
-  const { hasMinimumRole } = useAuth()
-  const canOperate = hasMinimumRole('Operator')
   const sessions = usePolling(() => api.getDatasetSessions(), 4000)
   const reloadSessions = sessions.reload
   const recipes = usePolling(() => api.getRecipes(), 8000)
@@ -228,24 +225,6 @@ export default function DatasetPage() {
     }
   }
 
-  const importFile = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!active) return
-    const form = event.currentTarget
-    const file = (form.elements.namedItem('image') as HTMLInputElement).files?.[0]
-    if (!file) return
-    setError(null)
-    try {
-      const session = await api.captureDatasetImage(active.sessionId, file)
-      setLocalSession({ data: session, baseline: sessions.data })
-      setMessage(`Imported ${session.imageCount} image(s). Bounding boxes were not invented.`)
-      sessions.reload()
-      form.reset()
-    } catch (reason) {
-      setError(getApiErrorMessage(reason, 'Image was not stored.'))
-    }
-  }
-
   const labelsReady = Boolean(labels.productClass && labels.qualityLabel && labels.colorLabel && labels.sizeLabel)
 
   return (
@@ -281,7 +260,7 @@ export default function DatasetPage() {
                 <p>Labels: {active.productClass} / {active.qualityLabel} / {active.colorLabel} / {active.sizeLabel}</p>
                 <p className="text-text-muted">{active.labelStatus}</p>
                 {active.notes && <p>Notes: {active.notes}</p>}
-                {canOperate && (
+                {(
                   <button type="button" className="rounded bg-warning px-3 py-2 text-sm text-white" onClick={() => void stop()}>
                     Stop session
                   </button>
@@ -291,7 +270,7 @@ export default function DatasetPage() {
               <p className="text-sm text-text-muted">No dataset session is active. Choose the recipe labels, then start a session.</p>
             )}
           </Panel>
-          {canOperate && (
+          {(
             <div className="flex flex-col gap-2">
               <button
                 type="button"
@@ -325,8 +304,8 @@ export default function DatasetPage() {
       </div>
 
       <Panel title={active ? 'Labels for the next capture' : 'Session labels'}>
-        <LabelFields definition={recipe?.definition} labels={labels} disabled={!canOperate} onChange={setLabels} />
-        {!active && canOperate && (
+        <LabelFields definition={recipe?.definition} labels={labels} onChange={setLabels} />
+        {!active && (
           <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3" onSubmit={start}>
             <label className="text-sm">
               <span className="mb-1 block text-text-muted">Recipe</span>
@@ -362,7 +341,7 @@ export default function DatasetPage() {
 
       {active && (
         <Panel title="Recent captures">
-          <RecentCaptures sessionId={active.sessionId} samples={active.recentSamples ?? []} canDiscard={canOperate} onDiscard={sampleId => void discard(sampleId)} />
+          <RecentCaptures sessionId={active.sessionId} samples={active.recentSamples ?? []} onDiscard={sampleId => void discard(sampleId)} />
         </Panel>
       )}
 
@@ -372,19 +351,6 @@ export default function DatasetPage() {
           <CountList title="Quality distribution" counts={active.qualityCounts} />
           <CountList title="Defect distribution" counts={active.defectCounts} />
         </div>
-      )}
-
-      {canOperate && active && (
-        <Panel title="Import from disk">
-          <details>
-            <summary className="cursor-pointer text-sm">Import a JPEG or PNG that is already on this computer</summary>
-            <form className="mt-3 flex flex-wrap items-center gap-3" onSubmit={importFile}>
-              <input name="image" type="file" accept="image/jpeg,image/png" required className="text-sm" />
-              <button type="submit" className="rounded-lg border border-card-border px-3 py-2 text-sm">Store imported image</button>
-            </form>
-            <p className="mt-2 text-xs text-text-muted">Disk import is a secondary path. It keeps the session labels and does not replace a camera capture.</p>
-          </details>
-        </Panel>
       )}
 
       <Panel title="Sessions">
@@ -408,12 +374,12 @@ export default function DatasetPage() {
 function LabelFields({
   definition,
   labels,
-  disabled,
+  disabled = false,
   onChange,
 }: {
   definition?: RecipeDefinition
   labels: Labels
-  disabled: boolean
+  disabled?: boolean
   onChange: (labels: Labels) => void
 }) {
   const classes = definition?.productClasses ?? []
@@ -519,12 +485,10 @@ function CountList({ title, counts }: { title: string; counts?: Record<string, n
 function RecentCaptures({
   sessionId,
   samples,
-  canDiscard,
   onDiscard,
 }: {
   sessionId: string
   samples: DatasetSample[]
-  canDiscard: boolean
   onDiscard: (sampleId: string) => void
 }) {
   const signature = samples.map(sample => sample.sampleId).join('|')
@@ -581,7 +545,7 @@ function RecentCaptures({
               {sample.sourceWidth && sample.sourceHeight ? ` · ${sample.sourceWidth}×${sample.sourceHeight}` : ''}
             </p>
             {sample.previewFallback && <p className="text-warning-light">Preview fallback was used. This is not the high-quality still.</p>}
-            {canDiscard && (
+            {(
               <button type="button" className="rounded border border-danger/50 px-2 py-1 text-danger-light" onClick={() => onDiscard(sample.sampleId)}>
                 Discard
               </button>

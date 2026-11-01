@@ -51,7 +51,7 @@ def artifact_format(model_path: str | Path | None) -> str | None:
 
 
 def load_export_contract(model_path: str | Path | None) -> dict:
-    """Read the sidecar written by ``training/export.py`` when it is present."""
+    """Read the sidecar written by ``SmartLine.Training/export.py`` when it is present."""
 
     if not model_path:
         return {}

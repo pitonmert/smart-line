@@ -37,7 +37,6 @@ ALLOW_PREVIEW_FALLBACK = os.environ.get("ALLOW_PREVIEW_FALLBACK", "false").lower
 PREFER_RAW_CAPTURE = os.environ.get("PREFER_RAW_CAPTURE", "true").lower() == "true"
 STILL_CAPTURE_TIMEOUT = float(os.environ.get("STILL_CAPTURE_TIMEOUT", "30"))
 API_BASE_URL = os.environ.get("API_BASE_URL", "")
-DEVICE_KEY = os.environ.get("DEVICE_KEY", "")
 CAM_CAPTURE_URL = os.environ.get("CAM_CAPTURE_URL", "")
 
 stop = False
@@ -96,7 +95,7 @@ def main():
         task=MODEL_TASK,
         model_version=MODEL_VERSION or None,
     )
-    recipes = ActiveRecipeSource(API_BASE_URL, DEVICE_KEY, recipe)
+    recipes = ActiveRecipeSource(API_BASE_URL, recipe)
     active, _meta = recipes.resolve(None)
     if active is not None:
         recipe = active
@@ -115,7 +114,6 @@ def main():
         ),
         "allow_preview_fallback": ALLOW_PREVIEW_FALLBACK,
         "calibration": None,
-        "service_key": os.environ.get("VISION_SERVICE_KEY", ""),
     }
     stream = CameraStream(CAM_URL)
     context["camera"] = stream

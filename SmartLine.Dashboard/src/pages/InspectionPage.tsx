@@ -1,13 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import CameraStage from '../components/camera/CameraStage'
 import { decisionTone, fieldClass, formatTime } from '../components/inspection/format'
 import { ErrorNote, Panel, SimulationBanner } from '../components/inspection/ui'
 import { usePolling } from '../hooks/usePolling'
 
 export default function InspectionPage() {
-  const { hasMinimumRole } = useAuth()
   const room = usePolling(() => api.getControlRoom(), 4000)
   const recipes = usePolling(() => api.getRecipes(), 15000)
   const requestId = useRef<string | null>(null)
@@ -63,7 +61,7 @@ export default function InspectionPage() {
     <div className="flex flex-col gap-4">
       {inspection?.simulation && <SimulationBanner text="The last inspection was simulated." />}
       {(room.error || recipes.error) && <ErrorNote>{room.error || recipes.error}</ErrorNote>}
-      {hasMinimumRole('Operator') && <button type="button" disabled={busy || !!room.error} onClick={() => void inspectCamera()} className="rounded-lg bg-primary px-3 py-2 text-white disabled:opacity-50">{busy ? 'Inspecting…' : 'Inspect camera with Vision'}</button>}
+      {<button type="button" disabled={busy || !!room.error} onClick={() => void inspectCamera()} className="rounded-lg bg-primary px-3 py-2 text-white disabled:opacity-50">{busy ? 'Inspecting…' : 'Inspect camera with Vision'}</button>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <CameraStage
           streamUrl={import.meta.env.VITE_CAMERA_STREAM_URL || recipe?.definition.cameraProfile.streamUrl || 'http://192.168.1.50:81/stream'}
@@ -99,7 +97,7 @@ export default function InspectionPage() {
           <p className="mt-3 text-xs text-text-muted">Depth is unavailable until VL53L1X integration. A missing model does not create a bounding box.</p>
         </Panel>
       </div>
-      {hasMinimumRole('Operator') && (
+      {(
         <Panel title="Manual inspection trigger">
           <p className="mb-3 text-xs text-text-muted">This records an operator observation through the API. It does not claim a model produced the class or a box.</p>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-3" onSubmit={submit}>

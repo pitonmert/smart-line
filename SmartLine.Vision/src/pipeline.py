@@ -1,7 +1,7 @@
 """One product, one selected frame, one inspection observation.
 
 The API remains the authority that persists the decision. This pipeline prepares
-the observation and can also run the same deterministic engine for a local preview.
+the observation; recipe acceptance and routing are evaluated only by the API.
 """
 
 from __future__ import annotations
@@ -9,7 +9,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from color_analysis import analyze_color
-from decision import decide
 from inference import InferenceEngine
 from size_estimation import estimate_visual_size, fuse_with_tof
 
@@ -18,9 +17,13 @@ def run_inspection(recipe: dict, frame_view: dict | None, trigger: dict, calibra
     captured_at = datetime.now(timezone.utc).isoformat()
     calibration = calibration or {}
     engine = engine or InferenceEngine(None)
-    if frame_view is not None and engine.backend is not None:
-        from frame_codec import decode_bgr
-        frame_view = {**frame_view, "frame": decode_bgr(frame_view.get("frame"))}
+    if frame_view is not None:
+        from frame_codec import decode_bgr, frame_size
+        frame = decode_bgr(frame_view.get("frame"))
+        frame_view = {**frame_view, "frame": frame}
+        width, height = frame_size(frame)
+        if width is not None and height is not None:
+            frame_view = {**frame_view, "width": width, "height": height}
     prediction = engine.predict(None if frame_view is None else frame_view.get("frame"))
     detections = prediction["detections"]
     primary = max(detections, key=lambda item: item.get("confidence", 0), default=None)
@@ -76,11 +79,9 @@ def run_inspection(recipe: dict, frame_view: dict | None, trigger: dict, calibra
         "captureSource": None if frame_view is None else frame_view.get("captureSource"),
         "previewFallback": False if frame_view is None else bool(frame_view.get("previewFallback")),
     }
-    preview = decide(recipe, observation)
     return {
         "capturedAt": captured_at,
         "observation": observation,
-        "previewDecision": preview,
         "inference": {
             "available": prediction["available"],
             "backend": prediction["backend"],

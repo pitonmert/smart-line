@@ -91,16 +91,16 @@ QoS: 1
 Retained: true
 ```
 
-`resetGeneration`, yalnız yetkili Admin resetinde artan monoton sayıdır. `acknowledgedFireEpoch` ve `acknowledgedFireGeneration`, API'nin işlediği son yerel güvenlik olayının kimliğidir. Firmware NVS'deki son uygulanmış değerden daha yeni bir reset, kendi epoch'u ile birebir eşleşen acknowledgement ve kendi generation değerini kapsayan sayaç birlikte gelmedikçe latch'i açmaz. Start için de aynı epoch/generation eşleşmesi zorunludur.
+`resetGeneration`, yalnız API üzerinden manuel reset isteğinde artan monoton sayıdır. `acknowledgedFireEpoch` ve `acknowledgedFireGeneration`, API'nin işlediği son yerel güvenlik olayının kimliğidir. Firmware NVS'deki son uygulanmış değerden daha yeni bir reset, kendi epoch'u ile birebir eşleşen acknowledgement ve kendi generation değerini kapsayan sayaç birlikte gelmedikçe latch'i açmaz. Start için de aynı epoch/generation eşleşmesi zorunludur.
 
 | İşlem                 | Payload                                                                                                                | Firmware etkisi                                                               |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Normal stop           | `{"isRunning":false,"emergency":false,"resetGeneration":N,"acknowledgedFireEpoch":E,"acknowledgedFireGeneration":F}`   | Durur; latch ve reset nesli değişmez                                          |
 | Emergency stop / fire | `{"isRunning":false,"emergency":true,"resetGeneration":N,"acknowledgedFireEpoch":E,"acknowledgedFireGeneration":F}`    | Emergency latch'i aktive eder ve güvenlik kaydına yazar                       |
-| Admin reset           | `{"isRunning":false,"emergency":false,"resetGeneration":N+1,"acknowledgedFireEpoch":E,"acknowledgedFireGeneration":F}` | Reset yeni, `E/F` cihazla eşleşiyor ve fire temizse latch'i açar; çalıştırmaz |
+| Manual reset          | `{"isRunning":false,"emergency":false,"resetGeneration":N+1,"acknowledgedFireEpoch":E,"acknowledgedFireGeneration":F}` | Reset yeni, `E/F` cihazla eşleşiyor ve fire temizse latch'i açar; çalıştırmaz |
 | Start                 | `{"isRunning":true,"emergency":false,"resetGeneration":N,"acknowledgedFireEpoch":E,"acknowledgedFireGeneration":F}`    | Epoch/generation eşleşiyor, fire/latch/persistence fault temizse çalışır      |
 
-Normal stop ile reset artık aynı komut değildir: yalnız yeni `resetGeneration` ve eşleşen `(acknowledgedFireEpoch, acknowledgedFireGeneration)` birlikte yetkili reset kanıtıdır. Firmware yerel fire aktifken veya API acknowledgement değeri gerideyken yeni reset neslini tüketir fakat latch'i açmaz; fire temizlenip API olayı gördükten sonra yeniden Admin reset gerekir. NVS silinmesi/cihaz değişimi yeni epoch ürettiği için eski retained reset veya start yeni yerel latch'i temizleyemez.
+Normal stop ile reset artık aynı komut değildir: yalnız yeni `resetGeneration` ve eşleşen `(acknowledgedFireEpoch, acknowledgedFireGeneration)` birlikte yetkili reset kanıtıdır. Firmware yerel fire aktifken veya API acknowledgement değeri gerideyken yeni reset neslini tüketir fakat latch'i açmaz; fire temizlenip API olayı gördükten sonra yeniden manuel reset gerekir. NVS silinmesi/cihaz değişimi yeni epoch ürettiği için eski retained reset veya start yeni yerel latch'i temizleyemez.
 
 Speed payload'ı `{"speed":75}` biçimindedir, `0..100` aralığına clamp edilir ve hiçbir running/emergency durumunu temizlemez. Mevcut prototipte bu değer fiziksel motor PWM çıkışına bağlı değildir. Fan payload'ı `{"active":true}` biçimindedir.
 
@@ -113,7 +113,7 @@ Her ana döngüde alev sensörü önce okunur. Öncelik sırası:
 3. Conveyor running değilse servo `0°` kalır.
 4. Yalnız tüm interlock'lar temiz ve running ise renk ayrıştırma açısı (`0°`/`90°`) uygulanır.
 
-Admin reset yalnız latch'i açar; yeniden hareket için ayrıca start komutu gerekir.
+Manual reset clears only the latch; starting the conveyor requires a separate start command.
 
 ## Build ve upload
 

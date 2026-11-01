@@ -10,8 +10,6 @@ import AlertsToggle from './components/alerts/AlertsToggle'
 import AlertsPanel from './components/alerts/AlertsPanel'
 import SimulatorToggle from './components/simulator/SimulatorToggle'
 import SimulatorPanel from './components/simulator/SimulatorPanel'
-import LoginPage from './components/auth/LoginPage'
-import { AuthProvider, useAuth } from './auth/AuthContext'
 import { useRoute } from './navigation/useRoute'
 import ControlRoom from './pages/ControlRoom'
 import InspectionPage from './pages/InspectionPage'
@@ -29,9 +27,8 @@ function Dashboard() {
   useDashboard()
   useAlertSound()
   const { error } = useDashboardState()
-  const { hasMinimumRole } = useAuth()
   const [openPanel, setOpenPanel] = useState<'simulator' | 'alerts' | null>(null)
-  const simulatorEnabled = import.meta.env.DEV && hasMinimumRole('Operator')
+  const simulatorEnabled = import.meta.env.DEV
   const { path, navigate } = useRoute()
   const navigation = <SideNav path={path} onNavigate={navigate} />
   const mobileNavigation = <SideNav compact path={path} onNavigate={navigate} />
@@ -97,30 +94,10 @@ function Dashboard() {
   )
 }
 
-function AuthenticatedApp() {
-  const { status } = useAuth()
-
-  if (status === 'loading') {
-    return (
-      <main className="min-h-screen grid place-items-center bg-surface text-sm text-text-muted">
-        Oturum doğrulanıyor...
-      </main>
-    )
-  }
-
-  if (status === 'anonymous') return <LoginPage />
-
+export default function App() {
   return (
     <DashboardProvider>
       <Dashboard />
     </DashboardProvider>
-  )
-}
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
   )
 }

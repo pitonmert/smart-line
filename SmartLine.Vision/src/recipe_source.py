@@ -1,6 +1,6 @@
 """Active product recipe for Vision.
 
-The API database is the source of truth. Vision reads it with the device key,
+The API database is the source of truth. Vision reads its public snapshot,
 which stays in this process and is never returned by the control API. A recipe
 file remains the offline fallback. An inspection request may also carry the
 snapshot the API already validated.
@@ -14,9 +14,8 @@ from urllib import error, request
 
 
 class ActiveRecipeSource:
-    def __init__(self, api_base: str, device_key: str, file_recipe: dict | None = None, transport=None, ttl_seconds: float = 2.0) -> None:
+    def __init__(self, api_base: str, file_recipe: dict | None = None, transport=None, ttl_seconds: float = 2.0) -> None:
         self.api_base = api_base.rstrip("/")
-        self.device_key = device_key
         self.file_recipe = file_recipe
         self.ttl_seconds = ttl_seconds
         self._transport = transport or _get_json
@@ -45,7 +44,7 @@ class ActiveRecipeSource:
         return None, {"source": "missing", "id": None, "name": None, "version": None}
 
     def _fetch(self) -> dict | None:
-        if not self.api_base or not self.device_key:
+        if not self.api_base:
             return self._cached
         now = datetime.now(timezone.utc)
         if self._cached is not None and self._cached_at is not None:
@@ -56,7 +55,7 @@ class ActiveRecipeSource:
         try:
             payload = self._transport(
                 url,
-                {"X-Device-Key": self.device_key, "Accept": "application/json"},
+                {"Accept": "application/json"},
             )
         except Exception as exc:  # noqa: BLE001 - keep the last good snapshot
             self.last_error = str(exc)

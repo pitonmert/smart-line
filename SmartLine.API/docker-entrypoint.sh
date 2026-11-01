@@ -8,7 +8,7 @@ runtime_group=$APP_UID
 
 require_file() {
     if [ ! -r "$1" ]; then
-        echo "Required MQTT TLS file is missing or unreadable: $1" >&2
+        echo "Required TLS file is missing or unreadable: $1" >&2
         exit 1
     fi
 }
@@ -24,6 +24,16 @@ install -m 0444 -o "$runtime_user" -g "$runtime_group" \
     "$source_dir/smartline-api.crt" "$target_dir/smartline-api.crt"
 install -m 0400 -o "$runtime_user" -g "$runtime_group" \
     "$source_dir/smartline-api.key" "$target_dir/smartline-api.key"
+
+# The production API terminates HTTPS using the existing LAN server certificate.
+if [ -n "${ASPNETCORE_Kestrel__Certificates__Default__Path:-}" ]; then
+    require_file "$source_dir/smartline.local.crt"
+    require_file "$source_dir/smartline.local.key"
+    install -m 0444 -o "$runtime_user" -g "$runtime_group" \
+        "$source_dir/smartline.local.crt" "$target_dir/smartline.local.crt"
+    install -m 0400 -o "$runtime_user" -g "$runtime_group" \
+        "$source_dir/smartline.local.key" "$target_dir/smartline.local.key"
+fi
 
 # Dataset images must stay writable when the API source tree is mounted
 # read-only. Compose points Dataset__Root at this directory.

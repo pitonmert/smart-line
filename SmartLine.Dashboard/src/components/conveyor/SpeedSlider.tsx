@@ -6,10 +6,9 @@ interface Props {
   currentSpeed: number
   isRunning: boolean
   isEmergencyStopped: boolean
-  canControl: boolean
 }
 
-export default function SpeedSlider({ currentSpeed, isRunning, isEmergencyStopped, canControl }: Props) {
+export default function SpeedSlider({ currentSpeed, isRunning, isEmergencyStopped }: Props) {
   const [localSpeed, setLocalSpeed] = useState(currentSpeed)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +43,7 @@ export default function SpeedSlider({ currentSpeed, isRunning, isEmergencyStoppe
         onChange={e => { setLocalSpeed(Number(e.target.value)); setError(null) }}
         onPointerDown={() => { isDraggingRef.current = true }}
         onPointerUp={() => { isDraggingRef.current = false }}
-        disabled={!canControl || isRunning || isEmergencyStopped || loading}
+        disabled={isRunning || isEmergencyStopped || loading}
         className="w-full accent-primary-light disabled:opacity-40"
       />
       <div className="flex items-center justify-between">
@@ -52,7 +51,7 @@ export default function SpeedSlider({ currentSpeed, isRunning, isEmergencyStoppe
         {isDirty && (
           <button
             onClick={handleApply}
-            disabled={!canControl || loading || isRunning || isEmergencyStopped}
+            disabled={loading || isRunning || isEmergencyStopped}
             className="text-xs px-3 py-1 rounded bg-primary hover:bg-primary-light text-white disabled:opacity-50 transition-colors"
           >
             {loading ? 'Gönderiliyor...' : 'Uygula'}
@@ -60,7 +59,6 @@ export default function SpeedSlider({ currentSpeed, isRunning, isEmergencyStoppe
         )}
       </div>
       {error && <p className="text-xs text-danger-light">{error}</p>}
-      {!canControl && <p className="text-xs text-text-muted">Hız ayarı Operator yetkisi gerektirir.</p>}
     </div>
   )
 }

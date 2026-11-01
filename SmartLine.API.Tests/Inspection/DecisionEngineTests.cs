@@ -48,10 +48,14 @@ public class DecisionEngineTests
             Assert.Equal(expected.Simulation, result.Simulation);
     }
 
-    [Fact]
-    public void RejectsConfidenceOutsideTheUnitInterval()
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.4)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void RejectsConfidenceOutsideTheUnitInterval(double confidence)
     {
-        var observation = new InspectionObservation { Confidence = 1.4 };
+        var observation = new InspectionObservation { Confidence = confidence };
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             DecisionEngine.Decide(Recipe, observation)
         );

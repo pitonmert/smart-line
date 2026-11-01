@@ -173,6 +173,7 @@ infra/certs/generated/
 **/__pycache__/
 **/.pytest_cache/
 **/dist/
+SmartLine.API/wwwroot/
 **/build/
 
 # AI datasets / trained artifacts

@@ -46,8 +46,8 @@ services:
 
   api:
     build:
-      context: ./SmartLine.API
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: SmartLine.API/Dockerfile
       target: development
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -63,12 +63,6 @@ services:
       Mqtt__CaCertificatePath: /run/smartline/certs/ca.crt
       Mqtt__ClientCertificatePath: /run/smartline/certs/smartline-api.crt
       Mqtt__ClientKeyPath: /run/smartline/certs/smartline-api.key
-      DeviceAuthentication__Key: ${DEVICE_KEY}
-      Jwt__SigningKey: ${JWT_SIGNING_KEY}
-      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL}
-      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD}
-      ReverseProxy__KnownProxy: 172.31.0.10
-      Vision__ServiceKey: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
       Vision__CaptureTimeoutSeconds: ${VISION_CAPTURE_TIMEOUT_SECONDS:-35}
       Dataset__Root: /var/lib/smartline/datasets
     volumes:
@@ -95,7 +89,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
-    networks: [backend, frontend]
+    networks: [backend]
 
   dashboard:
     build:
@@ -103,7 +97,6 @@ services:
       dockerfile: Dockerfile
     environment:
       API_TARGET: http://api:5047
-      SMARTLINE_DEVICE_KEY: ${DEVICE_KEY}
     volumes:
       - ./SmartLine.Dashboard:/app
       - dashboard_node_modules:/app/node_modules
@@ -112,9 +105,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    networks:
-      frontend:
-        ipv4_address: 172.31.0.10
+    networks: [backend]
 
   vision:
     profiles: ["vision"]
@@ -133,12 +124,10 @@ services:
       CAM_STREAM_URL: ${CAM_STREAM_URL}
       CAM_CAPTURE_URL: ${CAM_CAPTURE_URL:-}
       VISION_CONTROL_HOST: 0.0.0.0
-      VISION_SERVICE_KEY: ${VISION_SERVICE_KEY:-${DEVICE_KEY}}
       STILL_CAPTURE_TIMEOUT: ${STILL_CAPTURE_TIMEOUT:-30}
       MODEL_PATH: ${MODEL_PATH:-}
       MODEL_VERSION: ${MODEL_VERSION:-}
       API_BASE_URL: http://api:5047
-      DEVICE_KEY: ${DEVICE_KEY}
       ALLOW_PREVIEW_FALLBACK: "false"
       LOG_LEVEL: DEBUG
       SHOW_PREVIEW: "false"
@@ -167,7 +156,3 @@ volumes:
 
 networks:
   backend:
-  frontend:
-    ipam:
-      config:
-        - subnet: 172.31.0.0/24

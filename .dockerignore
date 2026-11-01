@@ -1,14 +1,27 @@
-# The root build context is used only by infra/caddy/Dockerfile. Start from a
-# deny-all policy so repository history, environment files, generated private
-# keys, firmware credentials, dependencies, and build outputs cannot enter it.
+# The API image builds both the backend and Dashboard. Only approved source files
+# enter the build context; secrets, local settings and build outputs stay outside.
 **
 
 !.dockerignore
-
-!infra/
-!infra/caddy/
-!infra/caddy/Caddyfile
-!infra/caddy/Dockerfile
+!SmartLine.API/
+!SmartLine.API/Program.cs
+!SmartLine.API/SmartLine.API.csproj
+!SmartLine.API/Dockerfile
+!SmartLine.API/docker-entrypoint.sh
+!SmartLine.API/appsettings.json
+!SmartLine.API/appsettings.Development.json
+!SmartLine.API/Contracts/
+!SmartLine.API/Contracts/**
+!SmartLine.API/Domain/
+!SmartLine.API/Domain/**
+!SmartLine.API/Features/
+!SmartLine.API/Features/**
+!SmartLine.API/Infrastructure/
+!SmartLine.API/Infrastructure/**
+!SmartLine.API/Migrations/
+!SmartLine.API/Migrations/**
+!SmartLine.API/Shared/
+!SmartLine.API/Shared/**
 
 !SmartLine.Dashboard/
 !SmartLine.Dashboard/package.json
@@ -23,3 +36,18 @@
 !SmartLine.Dashboard/public/**
 !SmartLine.Dashboard/src/
 !SmartLine.Dashboard/src/**
+
+# Keep local artifacts and credentials excluded even inside approved directories.
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/logs
+**/.git
+**/.env*
+**/*.user
+**/*.key
+**/*.pfx
+**/*.p12
+SmartLine.API/appsettings.*.json
+!SmartLine.API/appsettings.Development.json

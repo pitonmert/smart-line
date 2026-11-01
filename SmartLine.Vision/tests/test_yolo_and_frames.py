@@ -1,3 +1,4 @@
+import io
 import json
 import sys
 import tempfile
@@ -15,8 +16,15 @@ from inference import InferenceEngine, load_export_contract, select_backend
 from yolo_decode import decode_detections, infer_layout, letterbox_meta
 
 
-LIVE_JPEG = b"\xff\xd8\xff\xd9"
-STILL_JPEG = b"\xff\xd8\xff\x00\xd9"
+def jpeg(width, height):
+    from PIL import Image
+    output = io.BytesIO()
+    Image.new("RGB", (width, height), (220, 20, 20)).save(output, format="JPEG")
+    return output.getvalue()
+
+
+LIVE_JPEG = jpeg(240, 176)
+STILL_JPEG = jpeg(640, 480)
 
 
 def identity_meta(width=100, height=80):

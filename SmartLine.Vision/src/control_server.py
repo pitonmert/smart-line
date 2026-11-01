@@ -7,7 +7,6 @@ and does not write the dataset. MQTT credentials are not part of any response.
 from __future__ import annotations
 
 import json
-import hmac
 from threading import Lock, BoundedSemaphore
 from triggers import TriggerRequest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -50,20 +49,13 @@ def start_control_server(host: str, port: int, context: dict) -> Thread:
 
 def _handler(context: dict):
     class Handler(BaseHTTPRequestHandler):
-        def _authorized(self):
-            key = context.get("service_key")
-            if key and not hmac.compare_digest(self.headers.get("X-Vision-Key", ""), key):
-                self._send(401, {"error": "unauthorized"})
-                return False
-            return True
-
         def do_GET(self):  # noqa: N802 - stdlib naming
             path = urlsplit(self.path).path
             if path == "/health":
                 self._send(200, _health(context))
                 return
             if path.startswith("/frames/"):
-                if not self._authorized(): return
+
                 role = path.removeprefix("/frames/").strip("/")
                 if role == "preview":
                     selected, failure = _acquire(context, role)
@@ -78,7 +70,7 @@ def _handler(context: dict):
             self._send(404, {"error": "not_found"})
 
         def do_POST(self):
-            if not self._authorized(): return
+
             if not context["operation_lock"].acquire(blocking=False):
                 self._send(409, {"error": "inspection_busy"})
                 return
@@ -161,8 +153,8 @@ def _handler(context: dict):
                 result["frame"] = {
                     "role": selected.role,
                     "origin": selected.origin,
-                    "width": selected.width,
-                    "height": selected.height,
+                    "width": result["observation"]["sourceWidth"],
+                    "height": result["observation"]["sourceHeight"],
                     "capturedAt": selected.captured_at.isoformat(),
                     "captureSource": selected.capture_source,
                     "previewFallback": selected.preview_fallback,
@@ -191,8 +183,8 @@ def _handler(context: dict):
             except (ValueError, RuntimeError) as exc:
                 self._send(409, {"error": "frame_encode_failed", "detail": str(exc)})
                 return
-            width = selected.width if selected.width is not None else encoded_width
-            height = selected.height if selected.height is not None else encoded_height
+            width = encoded_width
+            height = encoded_height
             self.send_response(200)
             self.send_header("Content-Type", "image/jpeg")
             self.send_header("Content-Length", str(len(payload)))

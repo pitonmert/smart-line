@@ -20,7 +20,6 @@ public sealed class VisionEndpointOptions
 {
     public const string SectionName = "Vision";
     public string HealthUrl { get; set; } = "";
-    public string ServiceKey { get; set; } = "";
     public int CaptureTimeoutSeconds { get; set; } = 35;
 }
 

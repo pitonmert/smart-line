@@ -9,20 +9,43 @@ from __future__ import annotations
 
 import io
 
+MAX_PIXELS = 16_000_000
 
-def encode_jpeg(frame, quality: int = 80) -> tuple[bytes, int | None, int | None]:
+
+def _validate_size(width: int, height: int) -> None:
+    if width <= 0 or height <= 0 or width * height > MAX_PIXELS:
+        raise ValueError("Image dimensions must be positive and within the pixel limit.")
+
+
+def _read_jpeg(payload: bytes):
+    from PIL import Image
+
+    if payload[:2] != b"\xff\xd8" or not payload.endswith(b"\xff\xd9"):
+        raise ValueError("Frame is not a complete JPEG.")
+    try:
+        image = Image.open(io.BytesIO(payload))
+        try:
+            if image.format != "JPEG":
+                raise ValueError("Frame is not a JPEG.")
+            _validate_size(image.width, image.height)
+            image.load()
+            return image
+        except Exception:
+            image.close()
+            raise
+    except (OSError, Image.DecompressionBombError) as exc:
+        raise ValueError("Frame JPEG cannot be decoded.") from exc
+
+
+def encode_jpeg(frame, quality: int = 80) -> tuple[bytes, int, int]:
     if isinstance(frame, (bytes, bytearray)):
         payload = bytes(frame)
-        if payload[:2] != b"\xff\xd8":
-            raise ValueError("Frame bytes are not a JPEG.")
-        return payload, None, None
+        with _read_jpeg(payload) as image:
+            return payload, image.width, image.height
     if isinstance(frame, dict) and "jpeg" in frame:
         payload = bytes(frame["jpeg"])
-        if payload[:2] != b"\xff\xd8":
-            raise ValueError("Frame JPEG is not valid.")
-        width = frame.get("width")
-        height = frame.get("height")
-        return payload, None if width is None else int(width), None if height is None else int(height)
+        with _read_jpeg(payload) as image:
+            return payload, image.width, image.height
     encoded = _encode_array(frame, quality)
     return encoded
 
@@ -39,7 +62,11 @@ def frame_size(frame) -> tuple[int | None, int | None]:
     return None, None
 
 
-def _encode_array(frame, quality: int) -> tuple[bytes, int | None, int | None]:
+def _encode_array(frame, quality: int) -> tuple[bytes, int, int]:
+    width, height = frame_size(frame)
+    if width is None or height is None:
+        raise ValueError("Frame dimensions are missing.")
+    _validate_size(width, height)
     try:
         import cv2
 
@@ -65,12 +92,9 @@ def _encode_array(frame, quality: int) -> tuple[bytes, int | None, int | None]:
 
 
 def decode_bgr(frame):
-    """JPEG fallback karelerini model ve renk analizi için gerçek piksele dönüştürür."""
+    """Decode JPEG fallback frames for inference and color analysis."""
     if not isinstance(frame, dict) or "jpeg" not in frame:
         return frame
     import numpy as np
-    from PIL import Image
-    with Image.open(io.BytesIO(frame["jpeg"])) as image:
-        if image.width * image.height > 16_000_000:
-            raise ValueError("Image exceeds the pixel limit")
+    with _read_jpeg(bytes(frame["jpeg"])) as image:
         return np.asarray(image.convert("RGB"))[:, :, ::-1].copy()

@@ -10,7 +10,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Product_pagination_normalizes_page_and_caps_page_size_at_one_hundred()
     {
         await SeedProductsAsync(105);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var response = await client.GetAsync("/api/products?pageNumber=0&pageSize=500");
         var page = await AssertSuccessAsync(response);
@@ -26,7 +26,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Product_pagination_returns_a_deterministic_second_page()
     {
         await SeedProductsAsync(15);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var response = await client.GetAsync("/api/products?pageNumber=2&pageSize=10");
         var page = await AssertSuccessAsync(response);
@@ -45,7 +45,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Filtered_product_collections_use_the_same_page_contract(string path)
     {
         await SeedProductsAsync(12, ProductStatus.NO_BARCODE);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var response = await client.GetAsync(path);
         var page = await AssertSuccessAsync(response);
@@ -70,7 +70,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     )
     {
         await SeedFilteredCollectionsAsync(25);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var page = await AssertSuccessAsync(await client.GetAsync(path));
 
@@ -91,7 +91,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Every_filtered_collection_returns_a_correct_second_page(string path)
     {
         await SeedFilteredCollectionsAsync(15);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var page = await AssertSuccessAsync(await client.GetAsync(path));
 
@@ -113,7 +113,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Every_filtered_collection_normalizes_page_and_caps_page_size(string path)
     {
         await SeedFilteredCollectionsAsync(105);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var page = await AssertSuccessAsync(
             await client.GetAsync($"{path}?pageNumber=0&pageSize=500")
@@ -130,7 +130,7 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
     public async Task Collection_order_is_stable_when_timestamps_are_equal()
     {
         await SeedFilteredCollectionsAsync(3);
-        using var client = Fixture.CreateUserClient("Viewer");
+        using var client = Fixture.CreateClient();
 
         var products = await AssertSuccessAsync(
             await client.GetAsync("/api/products/status/NO_BARCODE?pageSize=3")
