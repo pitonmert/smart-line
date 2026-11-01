@@ -409,7 +409,7 @@ void setup() {
   );
 
   Serial.println(
-    ":81/capture"
+    "/capture"
   );
 
   Serial.print(
@@ -421,7 +421,7 @@ void setup() {
   );
 
   Serial.println(
-    ":81/capture/raw"
+    "/capture/raw"
   );
 
   Serial.print(
@@ -433,7 +433,7 @@ void setup() {
   );
 
   Serial.println(
-    ":81/status"
+    "/status"
   );
 
   Serial.print(
@@ -445,7 +445,7 @@ void setup() {
   );
 
   Serial.println(
-    ":81/debug/throughput/internal?bytes=32768"
+    "/debug/throughput/internal?bytes=32768"
   );
 
 #if SMARTLINE_TCP_DIAG

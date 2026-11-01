@@ -135,7 +135,7 @@ Sabit IP zorunluya yakın bir gereksinimdir. `SmartLine.Vision`, kamera stream U
 7. `WIFI_STATIC_IP`, `WIFI_GATEWAY`, `WIFI_SUBNET` değerleriyle `WiFi.config` çağırır.
 8. `WiFi.begin` ile ağa bağlanır.
 9. WiFi bağlantısı 40 denemede, yani yaklaşık 20 saniyede kurulamazsa kartı yeniden başlatır.
-10. HTTP server'ı port 81'de başlatır ve `/stream`, `/capture`, `/capture/raw`, `/status`, `/debug/throughput`, `/debug/throughput/internal`, `/debug/throughput/psram` yollarını kaydeder. Yanıt başlığı sınırı 32, URI işleyici sınırı 12'dir. Sunucu görevi çekirdek 1'de çalışır.
+10. Port 81'deki HTTP sunucusunu yalnız `/stream` için, bağımsız port 80 sunucusunu ise `/capture`, `/capture/raw`, `/status` ve (etkinleştirildiğinde) `/debug/throughput` yolları için başlatır. Her iki sunucu görevi çekirdek 1'de çalışır; yanıt başlığı sınırı 32, URI işleyici sınırı 12'dir.
 11. Serial monitor'a stream, capture, status ve tanı aktarım URL'lerini yazar.
 
 `loop()` içinde aktif iş yapılmaz; ana iş stream handler içinde yürür.
@@ -159,7 +159,7 @@ Stream server `esp_http_server.h` ile kurulur.
 3. Frame zaten `PIXFORMAT_JPEG` ise sürücü tamponunu kopyalar. `fb->buf` serbest bırakılmaz.
 4. GC2145 RGB565 frame'ini kalite 60 ile yazılım JPEG'ine çevirir. Dönüşüm başarısız olursa sahte bir görüntü üretmez.
 5. Sürücü tamponunu `esp_camera_fb_return` ile geri verir ve kamera kilidini JPEG gönderilmeden açar.
-6. Parça başlığını, JPEG baytlarını 2048 baytlık parçalar halinde ve boundary ayırıcısını yazar. Sıfır uzunluklu HTTP chunk yazılmaz; o çağrı tüm yanıtı kapatır.
+6. Parça başlığını, JPEG baytlarını 2048 baytlık parçalar halinde ve boundary ayırıcısını yazar. Her gövde aktarımı kendi dahili-RAM staging tamponunu kullanır; port 80 still aktarımı port 81 yayınını bozamaz. Sıfır uzunluklu HTTP chunk yazılmaz; o çağrı tüm yanıtı kapatır.
 7. Gönderim bitince veya kesilince sahip olunan JPEG kopyası serbest bırakılır.
 
 İki saniyede bir seri özete kare sayısı, alma süresi, JPEG süresi, JPEG baytları ve gönderim süresi yazılır. Her kare için ayrı satır yazılmaz. `GET /status` son karenin `lastStreamCaptureMs`, `lastStreamJpegMs`, `lastStreamJpegBytes` ve `lastStreamSendMs` değerlerini tutar.
@@ -190,7 +190,7 @@ Varsayılan still boyu `FRAMESIZE_VGA` (`640x480`) ve yalnız PSRAM varken denen
 
 Önceki firmware'de VGA JPEG hazırlığı kartta yaklaşık 2362 ms, ham RGB565 hazırlığı yaklaşık 1931 ms ölçüldü. Aynı kartta 29125 baytlık bir JPEG yanıtı 60 saniyede 25390 baytta kaldı. Bu yüzden gövde, tek bir `httpd_resp_send` ile gönderilmez.
 
-Kurulu LwIP `TCP_SND_BUF_DEFAULT` değeri 5760 ve MSS 1436'dır. Parça boyu 2048'dir. İki parça, HTTP chunk çerçevesiyle birlikte 5760 baytlık gönderim tamponuna sığar. 4096 baytlık parça her yazımdan sonra pencerenin boşalmasını bekler. 1024 de sığar fakat 614400 baytlık ham karede sistem çağrısını ikiye katlar. Üretim yolu her parçayı dahili BSS çizik tamponuna kopyalayıp onu yazar. `malloc` 4096 bayttan büyük tamponları PSRAM'e koyduğu için JPEG de çoğu zaman PSRAM'dedir. Başarısız bir chunk'ın içinde kalan kısmi bayt sayısı `httpd_resp_send_chunk` tarafından bildirilmez. `lastBodyWritten` yalnız tamamı kabul edilen parçaların toplamıdır.
+Kurulu LwIP `TCP_SND_BUF_DEFAULT` değeri 5760 ve MSS 1436'dır. Parça boyu 2048'dir. İki parça, HTTP chunk çerçevesiyle birlikte 5760 baytlık gönderim tamponuna sığar. 4096 baytlık parça her yazımdan sonra pencerenin boşalmasını bekler. 1024 de sığar fakat 614400 baytlık ham karede sistem çağrısını ikiye katlar. Üretim yolu her aktarım çağrısı için dahili RAM'de bağımsız bir çizik tampon ayırır, her parçayı buna kopyalar ve senkron soket yazımı bitince serbest bırakır. Böylece port 80 still ve port 81 stream HTTP görevleri aynı tamponu paylaşmaz; ek 2 KB görev yığını da kullanılmaz. `malloc` 4096 bayttan büyük tamponları PSRAM'e koyduğu için JPEG de çoğu zaman PSRAM'dedir. Başarısız bir chunk'ın içinde kalan kısmi bayt sayısı `httpd_resp_send_chunk` tarafından bildirilmez. `lastBodyWritten` yalnız tamamı kabul edilen parçaların toplamıdır.
 
 Gönderim bitmeden sahip olunan tampon serbest bırakılmaz. İstemci koparsa veya bir parça başarısız olursa tampon serbest bırakılır, kamera önizlemede kalır ve `lastCaptureError` değiştirilmez. `lastTransportError` ayrıdır: boşsa son gövde tamamlanmıştır, `send_timeout`, `client_disconnected`, `send_failed` veya `throughput_alloc_failed` olabilir. Diğer soket alanları `lastTransportErrno`, `lastTransportEspErr`, `lastTransportTimeout`, `lastBodyStartedAtMs`, `lastBodyBytes`, `lastBodyWritten`, `lastBodySendMs`, `lastBodyChunkCount`, `lastBodyMaxChunkMs`, `lastBodyChunkBytes`, `lastTransportPath` değerleridir. `lastTransportPath` `jpeg`, `raw`, `stream` veya `debug` olur ve son gövde gönderimini gösterir.
 
@@ -271,7 +271,7 @@ Bağlı bir kameraya karşı host tarafı duman testi:
 python3 SmartLine.Cam/scripts/camera_smoke.py --base http://192.168.1.50:81 --captures 3
 ```
 
-Ham kareyi de denetlemek için aynı komuta `--raw` eklenir. Bu, JPEG denetimini kaldırmaz. Elli yakalama bu oturumda çalıştırılmaz. Gövde aktarımı, kullanıcı bu firmware'i yükleyip aşağıdaki tanı komutunu çalıştırana kadar doğrulanmış sayılmaz.
+Ham kareyi de denetlemek için aynı komuta `--raw` eklenir. Bu, JPEG denetimini kaldırmaz. Seri kabul komutu, firmware yüklendikten sonra gerçek kartta çalıştırılır; sonuçlar aşağıdaki fiziksel kabul kaydına yazılır.
 
 ```bash
 python3 SmartLine.Cam/scripts/transport_probe.py --base http://192.168.1.50:81
@@ -334,8 +334,21 @@ SmartLine.API
 - Kamera bağlantısı koptuğunda stream handler sonlanır; yeniden bağlanma istemci tarafında yapılmalıdır.
 
 
-## v0.2.0 concurrent capture acceptance
+## Eşzamanlı yakalama fiziksel kabul kaydı
 
-Port 81 serves the long-lived MJPEG preview. An independent HTTP server on port 80 serves `/capture`, `/capture/raw` and `/status`. Vision is the single stream consumer; Dashboard reads preview frames through API/Vision. HTTP throughput diagnostics require an explicit `SMARTLINE_HTTP_DIAG=1` build flag; they are unavailable in normal firmware.
+Firmware, statik IP `192.168.1.150` olan gerçek kartta yüklendi ve doğrulandı. Kurulum: ESP32-CAM (`ESP32-D0WD-V3`), GC2145 (`PID 0x2145`), kullanılabilir PSRAM, CP2102 UART ve 2.4 GHz Wi-Fi. Bu IP yerel ağ adresidir; Wi-Fi kimliği veya parolası kayda alınmamıştır.
 
-On the real board, run `python SmartLine.Cam/scripts/camera_smoke.py --base http://<cam-ip> --captures 50 --raw --concurrent` with Dashboard open. Run the concurrent phase with the external Vision stream stopped, because the script itself owns the single stream connection; separately verify still/status while Vision owns it. Check color, VGA dimensions, PSRAM, preview recovery and Wi-Fi reconnect. These hardware checks were not executed during integration; a successful build does not replace them.
+- İlk JPEG still denemesi: 640x480, 3/3 PASS.
+- `camera_smoke.py --captures 1 --raw --concurrent`: VGA RGB565 ve eşzamanlı istekler PASS.
+- `camera_smoke.py --captures 50 --concurrent`: PASS.
+- Bağımsız ve sürekli tüketilen MJPEG ile 50/50 JPEG still Pillow tarafından tam çözüldü; stream'den 1,943,552 bayt alındı, yeni stream gönderim hatası 0 ve stream okuyucu hatası 0 oldu.
+- Wi-Fi kesinti izlemesi: 90.9. saniyede `OFFLINE`, 155.3. saniyede `ONLINE`; iyileşme PASS. İyileşme sonrasında `/capture`, geçerli 640x480 JPEG döndürdü.
+
+Bu kanıt, port 81'de uzun ömürlü MJPEG sürerken port 80'deki still gövdesinin paylaşılmış staging tamponuyla bozulduğu hatanın tekrar edilmediğini gösterir. HTTP throughput tanı uçları normal firmware'de `SMARTLINE_HTTP_DIAG=1` olmadan kapalı kalır.
+
+### Kalan sınırlamalar ve gözlemler
+
+- Tek stream tüketicisi önerisi sürer: normal kullanımda tüketici `SmartLine.Vision` olmalıdır; Dashboard görüntüyü API/Vision üzerinden alır.
+- Kesinti sonrasında biriken stream gönderim hatası sayacı 5'ten 9'a çıktı. Bu artışın kaynağı bu çalışmada ilişkilendirilemedi; yeni hata sayısı sürekli-drain testinde 0'dı. Sayacı nedenine bağlamak için sonraki çalışmada zaman damgalı seri kayıt ve istemci bağlantı olayları birlikte toplanmalıdır.
+- Daha önce ara sıra `cam_hal` `EV-VSYNC-OVF` ve `EV-EOF-OVF` uyarıları görüldü. Bu kabul koşularında bozuk JPEG veya stream okuyucu hatasıyla ilişkilendirilmedi, ancak kamera sürücüsü/zamanlama gözlemi olarak izlenmelidir.
+- Kamera bağlantısı koptuğunda stream handler sonlanır; yeniden bağlanma istemci sorumluluğundadır.
