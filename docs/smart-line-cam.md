@@ -349,6 +349,24 @@ Bu kanıt, port 81'de uzun ömürlü MJPEG sürerken port 80'deki still gövdesi
 ### Kalan sınırlamalar ve gözlemler
 
 - Tek stream tüketicisi önerisi sürer: normal kullanımda tüketici `SmartLine.Vision` olmalıdır; Dashboard görüntüyü API/Vision üzerinden alır.
-- Kesinti sonrasında biriken stream gönderim hatası sayacı 5'ten 9'a çıktı. Bu artışın kaynağı bu çalışmada ilişkilendirilemedi; yeni hata sayısı sürekli-drain testinde 0'dı. Sayacı nedenine bağlamak için sonraki çalışmada zaman damgalı seri kayıt ve istemci bağlantı olayları birlikte toplanmalıdır.
-- Daha önce ara sıra `cam_hal` `EV-VSYNC-OVF` ve `EV-EOF-OVF` uyarıları görüldü. Bu kabul koşularında bozuk JPEG veya stream okuyucu hatasıyla ilişkilendirilmedi, ancak kamera sürücüsü/zamanlama gözlemi olarak izlenmelidir.
+- Önceki Wi-Fi kesinti deneyinde stream gönderim hatası sayacı 5'ten 9'a çıktı. Aşağıdaki istemci kapatma deneyleri sayaç artışının bağlantı kapanışlarında da oluşabildiğini gösterir; tarihsel dört artışın nedenini kesinleştirmez.
+- `EV-VSYNC-OVF` uyarısı Wi-Fi kesintisi olmadan da gözlendi. Önceden bildirilen `EV-EOF-OVF`, aşağıdaki yeni koşularda görülmedi. Uyarıların nedeni ve performans etkisi henüz kesinleşmedi.
+- Canlı MJPEG'de saniyeler süren kare aralıkları bulunuyor. Geçerli JPEG alınması, sürekli düşük gecikmeli yayın veya hareketli bantta ürün yakalama yeterliliğinin doğrulandığı anlamına gelmez.
 - Kamera bağlantısı koptuğunda stream handler sonlanır; yeniden bağlanma istemci sorumluluğundadır.
+
+### 2 Kasım 2026 bağlantı kurtarma gözlemleri
+
+Bu özet, geliştiricinin gönderdiği iki gerçek donanım test raporuna dayanır. Kurulum ESP32-D0WD-V3, GC2145 (`0x2145`), PSRAM, HQVGA MJPEG önizleme ve VGA still ayarıdır. Bildirilen kaynak commit'i `c9c2511a53bcd60a43703306fe91d2cee90e002a`, cihazdan doğrulanmış binary hash'i değildir. Ham arşivler depoda bulunmaz; özet hazırlanırken donanım testleri yeniden çalıştırılmadı.
+
+| Deney | Geçerli JPEG | Geçersiz JPEG | Stream failure sayacı | En uzun kare aralığı |
+| --- | ---: | ---: | --- | ---: |
+| Normal bağlantıda 120 saniyelik baseline | 207 | 0 | Test sonundaki istemci kapanışından sonra `0→1` | 7,789 sn |
+| Üç adet 90 saniyelik kontrollü istemci kapatma koşusu | 670 | 0 | Altı kapatmaya karşılık toplam `+6` | 8,467 sn |
+
+- Baseline boyunca 25 status örneğinin tamamında `cameraReady=true`; istemci okuma hatası veya kamera overflow uyarısı raporlanmadı. Ortalama hız 1,73 kare/sn, iki saniyeyi aşan kare aralığı sayısı 16 idi.
+- Kontrollü koşularda istemci her koşunun ortasında ve sonunda kapatıldı. Her kapanış sayaçta bir artışla eşleşti; hata `client_disconnected` veya `send_failed` olarak görünebildi. Bağlantı yeniden açıldığında geçerli görüntüler alınmaya devam etti; reboot ve istemci stream okuma hatası raporlanmadı.
+- İkinci kontrollü koşuda iki `EV-VSYNC-OVF` uyarısı, Wi-Fi kesintisi olmadan oluştu. Yakınlarında geçerli kareler alındı; ilişkili sayaç artışı, JPEG bozulması veya kalıcı takılma gösterilmedi. Üç koşuda `EV-EOF-OVF` görülmedi.
+- Bu deneylerde Wi-Fi ağı bilerek kesilmedi. İstemci bağlantısının kapanması, Wi-Fi kopup geri gelme testiyle aynı şey değildir. Önceki `5→9` artışı açıklanmış sayılmaz.
+- Uzun kare aralıkları bağlantının açık olduğu bölümlerde de görüldü; kesin kare kaybı miktarı veya gecikmenin kaynağı belirlenmedi. Bunlar MJPEG gözlemleridir, still çekim süresinin doğrudan ölçümü değildir. Yalnız sayaç artışı veya uyarı görülmesine dayanarak kamera firmware'i değiştirilmedi.
+
+Kaynak raporların arşiv referansları: `smartline-camera-recovery-baseline.tar.gz` (`camera-recovery-baseline-20261102T104218Z`) ve `camera-recovery-disconnect-tests.tar.gz` (`camera-recovery-intentional-disconnect-20261102T105744Z/run-{1,2,3}`).
