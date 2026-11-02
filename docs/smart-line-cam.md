@@ -329,7 +329,7 @@ SmartLine.API
 
 - MQTT yoktur.
 - API ile doğrudan konuşmaz.
-- Renk sensörü bu projede değildir; renk bilgisi ana ESP32 firmware sorumluluğundadır.
+- Ürün rengi kamera görüntüsünden Vision tarafından belirlenir. TCS34725 üretim akışına katılmaz; yalnız ayrı firmware `sensor-test` ortamında yerel izleme için kullanılabilir.
 - Aynı anda birden fazla stream tüketicisi ESP32-CAM'i zorlayabilir. Normal kullanımda tek tüketici `SmartLine.Vision` olmalıdır.
 - Kamera bağlantısı koptuğunda stream handler sonlanır; yeniden bağlanma istemci tarafında yapılmalıdır.
 

@@ -49,7 +49,7 @@ Servis yalnız karşılıklı doğrulanan TLS `8883` bağlantısını kabul eder
 }
 ```
 
-Publish QoS 1 ve retained olmayan mesajla yapılır. Renk tespiti Vision kapsamında değildir; `color` daima `null` gönderilir. Broker bağlantısı yoksa barcode başarılı yayınlanmış gibi loglanmaz.
+Publish QoS 1 ve retained olmayan mesajla yapılır. Bu barkod mesajında `color` daima `null` gönderilir; ürünün renk analizi ayrı inceleme akışında Vision tarafından yapılır. Broker bağlantısı yoksa barcode başarılı yayınlanmış gibi loglanmaz.
 
 ## Container
 

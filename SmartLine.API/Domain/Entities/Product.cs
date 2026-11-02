@@ -15,7 +15,7 @@ public class Product
     public string Barcode { get; set; } = string.Empty;
 
     /// <summary>
-    /// Renk sensöründen veya görüntü hattından gelen ürün rengi; okunamadığında boş kalabilir.
+    /// Product color reported by the image-processing pipeline; null when unavailable.
     /// </summary>
     public ProductColor? Color { get; set; }
 

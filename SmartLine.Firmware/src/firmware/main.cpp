@@ -5,7 +5,6 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_AHTX0.h>
-#include <Adafruit_TCS34725.h>
 #include <ESP32Servo.h>
 #include <Preferences.h>
 #include <esp_system.h>
@@ -21,10 +20,6 @@ const char* TOPIC_CMD_CONVEYOR = "smartline/commands/stop";
 const char* TOPIC_CMD_FAN = "smartline/commands/fan";
 
 Adafruit_AHTX0 aht;
-Adafruit_TCS34725 tcs = Adafruit_TCS34725(
-    TCS34725_INTEGRATIONTIME_50MS,
-    TCS34725_GAIN_4X
-);
 Servo conveyorServo;
 
 WiFiClientSecure tlsClient;
@@ -66,7 +61,6 @@ bool fanApiOverride = false;
 bool fanApiState = false;
 bool conveyorOutputReady = false;
 int targetSpeed = 50;
-int requestedServoAngle = 0;
 int latestFlameReading = 4095;
 
 unsigned long lastPublishTime = 0;
@@ -298,13 +292,9 @@ void consumeResetGeneration(
 }
 
 void applyConveyorOutput() {
-    const bool mustBeSafe =
-        localFireActive
-        || emergencyLatched
-        || safetyPersistenceFault
-        || !commandRunning;
     if (conveyorOutputReady) {
-        conveyorServo.write(mustBeSafe ? 0 : requestedServoAngle);
+        // Physical sorting is not configured; keep the prototype servo neutral.
+        conveyorServo.write(0);
     }
 }
 
@@ -528,12 +518,10 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
-    pinMode(COLOR_LED_PIN, OUTPUT);
     pinMode(BUZZER_PIN, OUTPUT);
     pinMode(FAN_PIN, OUTPUT);
     pinMode(FLAME_PIN, INPUT);
 
-    digitalWrite(COLOR_LED_PIN, LOW);
     digitalWrite(BUZZER_PIN, LOW);
     digitalWrite(FAN_PIN, LOW);
 
@@ -574,19 +562,12 @@ void setup() {
     conveyorServo.write(0);
 
     Wire.begin(21, 22);
-    Wire1.begin(32, 33);
     delay(500);
 
     if (!aht.begin(&Wire)) {
         Serial.println("[SENSOR] AHT10 not found.");
     } else {
         Serial.println("[SENSOR] AHT10 ready.");
-    }
-
-    if (!tcs.begin(TCS34725_ADDRESS, &Wire1)) {
-        Serial.println("[SENSOR] TCS34725 not found.");
-    } else {
-        Serial.println("[SENSOR] TCS34725 ready.");
     }
 
     updateLocalFireSafety();
@@ -670,15 +651,6 @@ void loop() {
     sensors_event_t temperature;
     aht.getEvent(&humidity, &temperature);
 
-    digitalWrite(COLOR_LED_PIN, HIGH);
-    delay(100);
-    uint16_t red;
-    uint16_t green;
-    uint16_t blue;
-    uint16_t clear;
-    tcs.getRawData(&red, &green, &blue, &clear);
-    digitalWrite(COLOR_LED_PIN, LOW);
-
     bool fanActive;
     if (fanApiOverride) {
         fanActive = fanApiState;
@@ -688,8 +660,6 @@ void loop() {
         digitalWrite(FAN_PIN, fanActive ? HIGH : LOW);
     }
 
-    const bool redDetected = red > 500 && red > green * 2 && red > blue * 2;
-    requestedServoAngle = redDetected ? 90 : 0;
     updateLocalFireSafety();
 
     Serial.println("\n==================================================");
@@ -713,13 +683,7 @@ void loop() {
     Serial.print(lastAppliedResetGeneration);
     Serial.print(" persistenceFault=");
     Serial.println(safetyPersistenceFault ? "true" : "false");
-    Serial.print("SERVO: ");
-    Serial.print(
-        localFireActive || emergencyLatched || safetyPersistenceFault || !commandRunning
-            ? 0
-            : requestedServoAngle
-    );
-    Serial.println(" degrees");
+    Serial.println("SERVO: 0 degrees (neutral; sorting disabled)");
     Serial.print("FAN: ");
     Serial.print(fanActive ? "ON" : "OFF");
     Serial.print(" | TARGET SPEED: ");

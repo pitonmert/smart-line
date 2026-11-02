@@ -1,6 +1,6 @@
 # SmartLine.Firmware teknik referansı
 
-`SmartLine.Firmware`, ESP32 üzerindeki sıcaklık, nem, alev ve renk sensörlerini okur. Ortam ve yangın durumunu MQTT üzerinden API'ye gönderir; konveyör, hız ve fan komutlarını broker üzerinden alır.
+`SmartLine.Firmware`, ESP32 üzerindeki sıcaklık, nem ve alev sensörlerini okur. Ortam ve yangın durumunu MQTT üzerinden API'ye gönderir; konveyör, hız ve fan komutlarını broker üzerinden alır. Ürün rengi kamera görüntüsünden Vision tarafından belirlenir. TCS34725 yalnız ayrı `sensor-test` ortamında yerel izleme için kullanılır.
 
 ## Güvenlik sınırı
 
@@ -13,7 +13,7 @@ localFireActive || emergencyLatched || !commandRunning
 
 Bu servo gerçek bant motorunu enerjisiz bırakan bir PWM/relay çıkışı değildir. Yazılım latch'i, fiziksel hardwired acil durdurma butonu, safety relay ve uygun makine güvenliği devresinin yerine geçmez.
 
-Firmware güvenli-durdurulmuş durumda açılır. Broker bağlantısı kesilirse komut durumu yeniden `stopped` yapılır. API'nin retained conveyor state mesajı yeniden bağlantıda tekrar alınana kadar servo `0°` konumunda kalır.
+Firmware güvenli-durdurulmuş durumda açılır. Broker bağlantısı kesilirse komut durumu yeniden `stopped` yapılır. Fiziksel ayırma komutu henüz uygulanmadığından servo, start komutu alınsa da nötr `0°` konumunda kalır.
 
 ## Proje yapısı
 
@@ -55,13 +55,13 @@ Script, `infra/certs/generated/ca.crt`, `smartline-firmware.crt`, `smartline-fir
 
 | Sabit           | GPIO | Kullanım                  |
 | --------------- | ---: | ------------------------- |
-| `COLOR_LED_PIN` |   26 | Renk sensörü aydınlatması |
+| `COLOR_LED_PIN` |   26 | Yalnız `sensor-test`: renk sensörü aydınlatması |
 | `FLAME_PIN`     |   34 | Analog alev sensörü       |
 | `FAN_PIN`       |   27 | Fan çıkışı                |
 | `BUZZER_PIN`    |   25 | Yangın uyarısı            |
 | `SERVO_PIN`     |   13 | Prototip ayırıcı servo    |
 
-AHT10 `Wire` üzerinde GPIO 21/22, TCS34725 ise `Wire1` üzerinde GPIO 32/33 kullanır.
+AHT10 `Wire` üzerinde GPIO 21/22 kullanır. Yalnız `sensor-test` ortamı, TCS34725 için GPIO 32/33 üzerinde `Wire1` başlatır. Normal firmware bu hattı ve renk sensörünü kullanmaz; sensör fiziksel olarak bağlı kalabilir.
 
 ## MQTT kimliği ve ACL
 
@@ -111,7 +111,7 @@ Her ana döngüde alev sensörü önce okunur. Öncelik sırası:
 1. Yerel fire aktifse latch edilir, buzzer açılır ve servo `0°` olur.
 2. Emergency latch aktifse fire temizlense dahi servo `0°` kalır.
 3. Conveyor running değilse servo `0°` kalır.
-4. Yalnız tüm interlock'lar temiz ve running ise renk ayrıştırma açısı (`0°`/`90°`) uygulanır.
+4. Tüm interlock'lar temiz ve running olsa da servo nötr `0°` konumunda kalır. Eski renge göre `90°` hareketi kaldırılmıştır; yeni fiziksel ayırma komutu bu değişikliğin kapsamında değildir.
 
 Manual reset clears only the latch; starting the conveyor requires a separate start command.
 
@@ -125,7 +125,26 @@ pio run -e firmware -t upload
 pio device monitor --baud 115200
 ```
 
-`sensor-test` ortamında da yangın durumunda servo güvenli `0°` konumuna gider.
+### Yerel renk sensörü izlemesi
+
+Renk ölçümlerini görmek için normal firmware yerine `sensor-test` yüklenmelidir:
+
+```bash
+pio run -e sensor-test -t upload
+pio device monitor --baud 115200
+```
+
+Bu ortam Wi-Fi veya MQTT kullanmaz; RGB ve clear değerleri yalnız seri monitörde gösterilir. Donanım testi için `R > G + 15`, `R > B + 15` ve `clear > 20` olduğunda servo `90°`, diğer durumlarda `0°` konumuna gider. Alev algılanırsa veya renk ölçümü kullanılamıyorsa servo `0°` kalır. Fan sıcaklığa, buzzer alev sensörüne göre çalışır; renk ölçümleri bunları etkilemez. Bu yerel test normal firmware'in üretim akışında bulunmaz.
+
+TCS34725 başlatılamazsa ölçüm atlanır. I²C işlem zaman aşımı 50 ms'dir; çalışma sırasında erişim hatası veya eksik veri alınırsa renk izlemesi yeniden başlatılana kadar kapatılır. Çıktı `unavailable` olur; geçersiz ölçüm sıfır gibi gösterilmez. Aydınlatma yalnız ölçüm sırasında açılır ve hata yollarında kapatılır. Renk sensörü arızası diğer sensörlerin yazılım akışını durdurmaz.
+
+Donanımsız regresyon kontrolleri:
+
+```bash
+python3 -m unittest discover -s SmartLine.Firmware/tests -p 'test_*.py' -v
+```
+
+Bu komut depo kökünde çalıştırılır ve bir C++17 derleyicisi gerektirir. Gerçek tanılama kodunu sahte I²C, sensör ve GPIO sürücüleriyle çalıştırır. Build ve simülasyon; lehimli kartın elektriksel durumu, gerçek sensör kopması veya gerçek eyleyici davranışının doğrulaması değildir.
 
 ## Operasyon sınırları
 
