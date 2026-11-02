@@ -13,8 +13,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
     private SmartLineApiFactory? _factory;
 
-    public RecordingMqttService Mqtt =>
-        Factory.Services.GetRequiredService<RecordingMqttService>();
+    public RecordingMqttService Mqtt => Factory.Services.GetRequiredService<RecordingMqttService>();
 
     private SmartLineApiFactory Factory =>
         _factory ?? throw new InvalidOperationException("API fixture has not been initialized.");
@@ -37,12 +36,14 @@ public sealed class ApiFixture : IAsyncLifetime
         _databaseLock.Dispose();
     }
 
-    public HttpClient CreateClient() => Factory.CreateClient(
-        new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false,
-            BaseAddress = new Uri("https://localhost"),
-        });
+    public HttpClient CreateClient() =>
+        Factory.CreateClient(
+            new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                BaseAddress = new Uri("https://localhost"),
+            }
+        );
 
     public WebSocketClient CreateHubWebSocketClient() => Factory.Server.CreateWebSocketClient();
 
@@ -112,10 +113,7 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseSetting("Mqtt:Username", "integration-test-api");
             builder.UseSetting("Mqtt:Password", new string('m', 64));
             builder.UseSetting("Mqtt:CaCertificatePath", "/tmp/integration-test-ca.crt");
-            builder.UseSetting(
-                "Mqtt:ClientCertificatePath",
-                "/tmp/integration-test-client.crt"
-            );
+            builder.UseSetting("Mqtt:ClientCertificatePath", "/tmp/integration-test-client.crt");
             builder.UseSetting("Mqtt:ClientKeyPath", "/tmp/integration-test-client.key");
             builder.UseSetting("Simulation:Enabled", "true");
             builder.UseSetting("Sorting:HardwareActuationEnabled", "false");
@@ -135,8 +133,7 @@ public sealed class ApiFixture : IAsyncLifetime
                 var mqttHostedServices = services
                     .Where(descriptor =>
                         descriptor.ServiceType == typeof(IHostedService)
-                        && descriptor.ImplementationType
-                            is { } implementationType
+                        && descriptor.ImplementationType is { } implementationType
                         && (
                             implementationType == typeof(MqttListenerService)
                             || implementationType == typeof(SensorDataProcessorService)

@@ -27,7 +27,9 @@ public sealed class StatisticsTests(ApiFixture fixture) : ApiTestBase(fixture)
         var daily = await AssertSuccessAsync(dailyResponse);
         var hourly = await AssertSuccessAsync(hourlyResponse);
 
-        var dailyTotal = daily.EnumerateArray().Single(item => item.GetProperty("hour").ValueKind == JsonValueKind.Null);
+        var dailyTotal = daily
+            .EnumerateArray()
+            .Single(item => item.GetProperty("hour").ValueKind == JsonValueKind.Null);
         Assert.Equal(2, dailyTotal.GetProperty("totalProducts").GetInt32());
         Assert.Equal(1, dailyTotal.GetProperty("defectiveProducts").GetInt32());
         Assert.Equal(1, dailyTotal.GetProperty("redProducts").GetInt32());

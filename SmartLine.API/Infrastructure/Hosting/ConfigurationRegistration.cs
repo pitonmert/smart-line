@@ -1,5 +1,5 @@
-using SmartLine.API.Infrastructure.Messaging.Mqtt;
 using SmartLine.API.Infrastructure.Configuration;
+using SmartLine.API.Infrastructure.Messaging.Mqtt;
 
 namespace SmartLine.API.Infrastructure.Hosting;
 
@@ -70,7 +70,8 @@ public static class ConfigurationRegistration
             .ValidateOnStart();
         builder.Services.AddSingleton(serviceProvider =>
             TimeZoneInfo.FindSystemTimeZoneById(
-                serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TimeZoneOptions>>()
+                serviceProvider
+                    .GetRequiredService<Microsoft.Extensions.Options.IOptions<TimeZoneOptions>>()
                     .Value.Id
             )
         );

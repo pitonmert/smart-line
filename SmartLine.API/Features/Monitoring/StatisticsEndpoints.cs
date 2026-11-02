@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Infrastructure.Persistence;
 using SmartLine.API.Shared;
 
@@ -10,8 +10,7 @@ public static class StatisticsEndpoints
 {
     public static RouteGroupBuilder MapStatisticsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app
-            .MapGroup("/api/statistics");
+        var group = app.MapGroup("/api/statistics");
         group.MapGet(
             "/daily",
             async (
@@ -120,7 +119,8 @@ public sealed class StatisticsHandler(ApplicationDbContext db, TimeZoneInfo time
                     statistic => statistic.Date == Today && statistic.Hour == null,
                     ct
                 )
-        ) is { } statistic
+        )
+            is { } statistic
             ? ToResponse(statistic)
             : null;
 

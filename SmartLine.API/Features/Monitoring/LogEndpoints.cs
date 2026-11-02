@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Infrastructure.Persistence;
 using SmartLine.API.Infrastructure.Realtime;
 using SmartLine.API.Shared;
@@ -12,8 +12,7 @@ public static class LogEndpoints
 {
     public static RouteGroupBuilder MapLogEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app
-            .MapGroup("/api/logs");
+        var group = app.MapGroup("/api/logs");
         group.MapGet(
             "",
             async (int? pageNumber, int? pageSize, LogHandler handler, CancellationToken ct) =>
@@ -160,7 +159,11 @@ public sealed class LogHandler(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "SignalR log notification failed for log {LogId}.", log.Id);
+            logger.LogWarning(
+                exception,
+                "SignalR log notification failed for log {LogId}.",
+                log.Id
+            );
         }
     }
 

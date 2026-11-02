@@ -90,7 +90,9 @@ public static class InspectionResultFactory
             observation.ObservationSource == "model" ? observation.ModelVersion : null,
             decision.Decision,
             decision.DestinationBin,
-            observation.ObservationSource == "model" ? processingLatencyMs ?? observation.ProcessingLatencyMs : null,
+            observation.ObservationSource == "model"
+                ? processingLatencyMs ?? observation.ProcessingLatencyMs
+                : null,
             observation.CameraSource ?? recipe.CameraProfile.StreamUrl ?? "",
             observation.ImageReference,
             decision.Simulation,

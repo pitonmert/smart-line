@@ -10,10 +10,10 @@ public static class DashboardEndpoints
     public static IEndpointRouteBuilder MapDashboardEndpoint(this IEndpointRouteBuilder app)
     {
         app.MapGet(
-                "/api/dashboard",
-                async (DashboardHandler handler, CancellationToken ct) =>
-                    Results.Ok(ApiResponse<DashboardResponse>.Success(await handler.GetAsync(ct)))
-            );
+            "/api/dashboard",
+            async (DashboardHandler handler, CancellationToken ct) =>
+                Results.Ok(ApiResponse<DashboardResponse>.Success(await handler.GetAsync(ct)))
+        );
         return app;
     }
 }

@@ -47,11 +47,7 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
             new { temperature = 45m, humidity = 70m }
         );
 
-        await AssertErrorAsync(
-            response,
-            HttpStatusCode.ServiceUnavailable,
-            "MQTT_UNAVAILABLE"
-        );
+        await AssertErrorAsync(response, HttpStatusCode.ServiceUnavailable, "MQTT_UNAVAILABLE");
         var state = await Fixture.WithDbContextAsync(async db => new
         {
             Conveyor = await db.ConveyorSettings.AsNoTracking().SingleAsync(),
@@ -86,9 +82,7 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
                 new { temperature = 35m, humidity = 50m }
             )
         );
-        var insideBand = await AssertSuccessAsync(
-            await viewer.GetAsync("/api/conveyor/status")
-        );
+        var insideBand = await AssertSuccessAsync(await viewer.GetAsync("/api/conveyor/status"));
         Assert.True(insideBand.GetProperty("fanActive").GetBoolean());
 
         await AssertSuccessAsync(
@@ -100,8 +94,8 @@ public sealed class EnvironmentTests(ApiFixture fixture) : ApiTestBase(fixture)
         var fanOff = await AssertSuccessAsync(await viewer.GetAsync("/api/conveyor/status"));
         Assert.False(fanOff.GetProperty("fanActive").GetBoolean());
 
-        var fanCommands = Fixture.Mqtt.Calls
-            .Where(call => call.Operation == nameof(IMqttService.PublishFanAsync))
+        var fanCommands = Fixture
+            .Mqtt.Calls.Where(call => call.Operation == nameof(IMqttService.PublishFanAsync))
             .Select(call => Assert.IsType<string>(call.Payload))
             .ToArray();
         Assert.Equal([bool.TrueString, bool.FalseString], fanCommands);

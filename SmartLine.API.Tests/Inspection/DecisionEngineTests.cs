@@ -26,7 +26,8 @@ public class DecisionEngineTests
         if (testCase.PhysicalLimits is not null)
             recipe.PhysicalLimits = testCase.PhysicalLimits;
         var result = DecisionEngine.Decide(recipe, testCase.Observation);
-        foreach (var reason in testCase.ExpectedReasons) Assert.Contains(reason, result.Reasons);
+        foreach (var reason in testCase.ExpectedReasons)
+            Assert.Contains(reason, result.Reasons);
         var expected = testCase.Expected;
         if (expected.ProductClass is not null)
             Assert.Equal(expected.ProductClass, result.ProductClass);

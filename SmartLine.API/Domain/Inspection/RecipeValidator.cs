@@ -15,10 +15,7 @@ public static class RecipeValidator
         InspectionVocabulary.Defective,
         InspectionVocabulary.ManualReview,
     ];
-    private static readonly HashSet<string> Tasks =
-    [
-        InspectionVocabulary.TaskDetect,
-    ];
+    private static readonly HashSet<string> Tasks = [InspectionVocabulary.TaskDetect];
     private static readonly HashSet<string> Roles =
     [
         InspectionVocabulary.Pass,
@@ -66,9 +63,18 @@ public static class RecipeValidator
         if (string.IsNullOrWhiteSpace(recipe.Name) || recipe.Name.Trim().Length > 80)
             errors.Add("Recipe name is required and must be at most 80 characters.");
 
-        if (recipe.Description is null) errors.Add("Recipe description must not be null.");
-        if (recipe.Model.ArtifactFileName is not null && string.IsNullOrWhiteSpace(recipe.Model.Version)) errors.Add("A model artifact requires its version.");
-        if (recipe.Description?.Length > 1000 || recipe.Model.Name?.Length > 80 || recipe.Model.Version?.Length > 80)
+        if (recipe.Description is null)
+            errors.Add("Recipe description must not be null.");
+        if (
+            recipe.Model.ArtifactFileName is not null
+            && string.IsNullOrWhiteSpace(recipe.Model.Version)
+        )
+            errors.Add("A model artifact requires its version.");
+        if (
+            recipe.Description?.Length > 1000
+            || recipe.Model.Name?.Length > 80
+            || recipe.Model.Version?.Length > 80
+        )
             errors.Add("Recipe description or model metadata is too long.");
 
         RequireCodes(errors, "product class", recipe.ProductClasses.Select(item => item.Code));

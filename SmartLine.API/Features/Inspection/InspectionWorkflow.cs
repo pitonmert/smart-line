@@ -78,8 +78,7 @@ public sealed class InspectionWorkflow(
                 observation.TriggerSource,
                 InspectionVocabulary.TriggerHardware,
                 StringComparison.OrdinalIgnoreCase
-            )
-            && !observation.Simulation
+            ) && !observation.Simulation
         )
         {
             throw new ValidationException(
@@ -99,21 +98,61 @@ public sealed class InspectionWorkflow(
         await using var transaction = await InspectionTransaction.BeginAsync(db, ct);
         var recipe = await LoadRecipeAsync(recipeId, ct);
         var definition = InspectionJson.Deserialize<ProductRecipeDefinition>(recipe.DefinitionJson);
-        var selectedCalibration = await db.CalibrationProfiles.AsNoTracking().SingleOrDefaultAsync(p => definition.CalibrationProfileId == null ? p.IsActive : p.Id == definition.CalibrationProfileId, ct);
-        if (definition.CalibrationProfileId is not null && selectedCalibration is null) throw new NotFoundException("Calibration profile");
+        var selectedCalibration = await db
+            .CalibrationProfiles.AsNoTracking()
+            .SingleOrDefaultAsync(
+                p =>
+                    definition.CalibrationProfileId == null
+                        ? p.IsActive
+                        : p.Id == definition.CalibrationProfileId,
+                ct
+            );
+        if (definition.CalibrationProfileId is not null && selectedCalibration is null)
+            throw new NotFoundException("Calibration profile");
         if (observation.ObservationSource == "model")
         {
-            if (!recipe.IsActive || selectedCalibration?.DefinitionJson != expectedCalibrationJson || selectedCalibration?.Id != expectedCalibrationId || selectedCalibration?.Version != expectedCalibrationVersion)
-                throw new ApiException(409, ErrorCodes.RecipeInvalid, "Active recipe or calibration changed. Inspect again.");
+            if (
+                !recipe.IsActive
+                || selectedCalibration?.DefinitionJson != expectedCalibrationJson
+                || selectedCalibration?.Id != expectedCalibrationId
+                || selectedCalibration?.Version != expectedCalibrationVersion
+            )
+                throw new ApiException(
+                    409,
+                    ErrorCodes.RecipeInvalid,
+                    "Active recipe or calibration changed. Inspect again."
+                );
         }
         if (expectedRecipeVersion is not null && recipe.Version != expectedRecipeVersion)
-            throw new ApiException(409, ErrorCodes.RecipeInvalid, "Recipe changed. Inspect again using the current version.");
+            throw new ApiException(
+                409,
+                ErrorCodes.RecipeInvalid,
+                "Recipe changed. Inspect again using the current version."
+            );
         if (observation.ObservationSource is not ("manual" or "model" or "simulation"))
             throw new ValidationException("Observation source is invalid.");
-        if (observation.CapturedAt is { Kind: DateTimeKind.Local } captured) observation.CapturedAt = captured.ToUniversalTime();
-        if (observation.ProcessingLatencyMs < 0 || observation.ModelName?.Length > 80 || observation.ModelVersion?.Length > 80 || observation.ImageReference?.Length > 300)
+        if (observation.CapturedAt is { Kind: DateTimeKind.Local } captured)
+            observation.CapturedAt = captured.ToUniversalTime();
+        if (
+            observation.ProcessingLatencyMs < 0
+            || observation.ModelName?.Length > 80
+            || observation.ModelVersion?.Length > 80
+            || observation.ImageReference?.Length > 300
+        )
             throw new ValidationException("Observation metadata is invalid.");
-        if (observation.BoundingBoxes?.Any(box => box is null || !double.IsFinite(box.X) || !double.IsFinite(box.Y) || !double.IsFinite(box.Width) || !double.IsFinite(box.Height) || box.X < 0 || box.Y < 0 || box.Width <= 0 || box.Height <= 0) == true)
+        if (
+            observation.BoundingBoxes?.Any(box =>
+                box is null
+                || !double.IsFinite(box.X)
+                || !double.IsFinite(box.Y)
+                || !double.IsFinite(box.Width)
+                || !double.IsFinite(box.Height)
+                || box.X < 0
+                || box.Y < 0
+                || box.Width <= 0
+                || box.Height <= 0
+            ) == true
+        )
             throw new ValidationException("Bounding boxes must have finite positive dimensions.");
         if (observation.CapturedAt > DateTime.UtcNow.AddSeconds(5))
             throw new ValidationException("Capture time cannot be in the future.");
@@ -124,7 +163,10 @@ public sealed class InspectionWorkflow(
         ProductTrack? existing = null;
         if (existingProductId is not null)
         {
-            existing = await db.ProductTracks.FirstOrDefaultAsync(track => track.Id == existingProductId, ct);
+            existing = await db.ProductTracks.FirstOrDefaultAsync(
+                track => track.Id == existingProductId,
+                ct
+            );
             if (existing is null)
                 throw new NotFoundException("Product", existingProductId);
             if (existing.IsSimulation)
@@ -166,18 +208,25 @@ public sealed class InspectionWorkflow(
                 if (current.Stage == InspectionVocabulary.StageCaptured)
                     ProductTracker.Advance(current, InspectionVocabulary.StageInspecting, now);
                 if (current.Stage != InspectionVocabulary.StageInspecting)
-                    throw new InvalidTrackingTransitionException(current.Stage, InspectionVocabulary.StageInspecting);
+                    throw new InvalidTrackingTransitionException(
+                        current.Stage,
+                        InspectionVocabulary.StageInspecting
+                    );
             }
             catch (InvalidTrackingTransitionException exception)
             {
-                throw new ValidationException(exception.Message, ErrorCodes.TrackingTransitionInvalid);
+                throw new ValidationException(
+                    exception.Message,
+                    ErrorCodes.TrackingTransitionInvalid
+                );
             }
 
             Copy(track, current);
         }
 
         started.Stop();
-        var latency = observation.ObservationSource == "model" ? observation.ProcessingLatencyMs : null;
+        var latency =
+            observation.ObservationSource == "model" ? observation.ProcessingLatencyMs : null;
         var inspectionId = requestedInspectionId ?? Guid.NewGuid();
         var result = InspectionResultFactory.Create(
             inspectionId,
@@ -191,7 +240,11 @@ public sealed class InspectionWorkflow(
             latency,
             recipe.Version
         );
-        result = result with { CalibrationProfileId = selectedCalibration?.Id, CalibrationVersion = selectedCalibration?.Version };
+        result = result with
+        {
+            CalibrationProfileId = selectedCalibration?.Id,
+            CalibrationVersion = selectedCalibration?.Version,
+        };
         if (result.Simulation && !result.Reasons.Contains("SIMULATION"))
             result = result with { Reasons = result.Reasons.Append("SIMULATION").ToArray() };
 
@@ -215,11 +268,16 @@ public sealed class InspectionWorkflow(
             {
                 ProductTracker.Advance(decided, InspectionVocabulary.StageQueued, now);
                 var calibration = await ActiveCalibrationAsync(definition.CalibrationProfileId, ct);
-                var distance = decision.Simulation ? simulatedDistanceMm ?? calibration?.InspectionToSorterDistanceMm : calibration?.InspectionToSorterDistanceMm;
+                var distance = decision.Simulation
+                    ? simulatedDistanceMm ?? calibration?.InspectionToSorterDistanceMm
+                    : calibration?.InspectionToSorterDistanceMm;
                 var speed = decision.Simulation
                     ? simulatedBeltSpeedMmPerSecond ?? calibration?.BeltSpeedMmPerSecond
                     : calibration?.BeltSpeedMmPerSecond;
-                decided.SortDueAt = SortingTiming.SortDueAt(now, SortingTiming.DelayMilliseconds(distance, speed));
+                decided.SortDueAt = SortingTiming.SortDueAt(
+                    now,
+                    SortingTiming.DelayMilliseconds(distance, speed)
+                );
             }
         }
         catch (InvalidTrackingTransitionException exception)
@@ -308,14 +366,25 @@ public sealed class InspectionWorkflow(
             ? await db.ProductRecipes.FirstOrDefaultAsync(item => item.IsActive, ct)
             : await db.ProductRecipes.FirstOrDefaultAsync(item => item.Id == recipeId, ct);
         if (recipe is null)
-            throw new NotFoundException(recipeId is null ? "Active product recipe" : "Product recipe");
+            throw new NotFoundException(
+                recipeId is null ? "Active product recipe" : "Product recipe"
+            );
         return recipe;
     }
 
-    private async Task<CalibrationDefinition?> ActiveCalibrationAsync(Guid? profileId, CancellationToken ct)
+    private async Task<CalibrationDefinition?> ActiveCalibrationAsync(
+        Guid? profileId,
+        CancellationToken ct
+    )
     {
-        var profile = await db.CalibrationProfiles.AsNoTracking().FirstOrDefaultAsync(item => profileId == null ? item.IsActive : item.Id == profileId, ct);
-        if (profile is null && profileId is not null) throw new NotFoundException("Calibration profile", profileId);
+        var profile = await db
+            .CalibrationProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => profileId == null ? item.IsActive : item.Id == profileId,
+                ct
+            );
+        if (profile is null && profileId is not null)
+            throw new NotFoundException("Calibration profile", profileId);
         return profile is null
             ? null
             : InspectionJson.Deserialize<CalibrationDefinition>(profile.DefinitionJson);
@@ -418,7 +487,11 @@ public sealed class InspectionWorkflow(
             track.SortDueAt
         );
 
-    private async Task PublishAsync(InspectionResult result, TrackResponse track, CancellationToken ct)
+    private async Task PublishAsync(
+        InspectionResult result,
+        TrackResponse track,
+        CancellationToken ct
+    )
     {
         try
         {
@@ -427,7 +500,11 @@ public sealed class InspectionWorkflow(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "SignalR inspection notification failed for {InspectionId}.", result.InspectionId);
+            logger.LogWarning(
+                exception,
+                "SignalR inspection notification failed for {InspectionId}.",
+                result.InspectionId
+            );
         }
     }
 
@@ -439,7 +516,11 @@ public sealed class InspectionWorkflow(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "SignalR tracking notification failed for {ProductId}.", track.ProductId);
+            logger.LogWarning(
+                exception,
+                "SignalR tracking notification failed for {ProductId}.",
+                track.ProductId
+            );
         }
     }
 }

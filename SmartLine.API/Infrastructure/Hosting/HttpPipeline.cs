@@ -26,25 +26,34 @@ public static class HttpPipeline
                 await next();
             }
         );
-        app.UseExceptionHandler(new ExceptionHandlerOptions
-        {
-            AllowStatusCode404Response = true,
-            // Expected client errors are warnings; the framework logs unexpected server errors.
-            SuppressDiagnosticsCallback = context => MapException(context.Exception).StatusCode < 500,
-            ExceptionHandler = async context =>
+        app.UseExceptionHandler(
+            new ExceptionHandlerOptions
             {
-                var exception = context.Features.Get<IExceptionHandlerFeature>()!.Error;
-                var (statusCode, message, code) = MapException(exception);
-                if (statusCode < 500)
-                    app.Logger.LogWarning(
-                        "Request failed: {ExceptionType}, StatusCode: {StatusCode}, Code: {Code}, Message: {Message}",
-                        exception.GetType().Name, statusCode, code, exception.Message);
+                AllowStatusCode404Response = true,
+                // Expected client errors are warnings; the framework logs unexpected server errors.
+                SuppressDiagnosticsCallback = context =>
+                    MapException(context.Exception).StatusCode < 500,
+                ExceptionHandler = async context =>
+                {
+                    var exception = context.Features.Get<IExceptionHandlerFeature>()!.Error;
+                    var (statusCode, message, code) = MapException(exception);
+                    if (statusCode < 500)
+                        app.Logger.LogWarning(
+                            "Request failed: {ExceptionType}, StatusCode: {StatusCode}, Code: {Code}, Message: {Message}",
+                            exception.GetType().Name,
+                            statusCode,
+                            code,
+                            exception.Message
+                        );
 
-                context.Response.StatusCode = statusCode;
-                await context.Response.WriteAsJsonAsync(
-                    ApiResponse<object>.Error(message, code), context.RequestAborted);
-            },
-        });
+                    context.Response.StatusCode = statusCode;
+                    await context.Response.WriteAsJsonAsync(
+                        ApiResponse<object>.Error(message, code),
+                        context.RequestAborted
+                    );
+                },
+            }
+        );
         app.UseStatusCodePages(async statusContext =>
         {
             var response = statusContext.HttpContext.Response;

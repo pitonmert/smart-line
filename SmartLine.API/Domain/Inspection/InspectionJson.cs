@@ -36,14 +36,21 @@ public static class InspectionJson
 
 public static class ContractCatalog
 {
-    public const string LegacyDemoBoxResource = "SmartLine.API.Contracts.recipes.demobox-legacy-320x240.json";
-    public const string UncalibratedResource = "SmartLine.API.Contracts.calibration.uncalibrated.json";
+    public const string LegacyDemoBoxResource =
+        "SmartLine.API.Contracts.recipes.demobox-legacy-320x240.json";
+    public const string UncalibratedResource =
+        "SmartLine.API.Contracts.calibration.uncalibrated.json";
 
     public static ProductRecipeDefinition LegacyDemoBox() =>
-        InspectionJson.Deserialize<ProductRecipeDefinition>(InspectionJson.ReadEmbedded(LegacyDemoBoxResource));
+        InspectionJson.Deserialize<ProductRecipeDefinition>(
+            InspectionJson.ReadEmbedded(LegacyDemoBoxResource)
+        );
 
     public static CalibrationDefinition Uncalibrated() =>
-        InspectionJson.Deserialize<CalibrationDefinition>(InspectionJson.ReadEmbedded(UncalibratedResource));
+        InspectionJson.Deserialize<CalibrationDefinition>(
+            InspectionJson.ReadEmbedded(UncalibratedResource)
+        );
+
     public const string DemoBoxResource = "SmartLine.API.Contracts.recipes.demobox.json";
     public const string DecisionCasesResource =
         "SmartLine.API.Contracts.fixtures.decision-cases.json";

@@ -33,5 +33,4 @@ public class Product
     /// Ürün kaydının son güncellendiği UTC zaman; audit ve eşzamanlılık takibi için kullanılır.
     /// </summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
 }

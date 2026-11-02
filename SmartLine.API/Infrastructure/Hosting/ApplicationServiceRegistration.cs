@@ -22,7 +22,9 @@ public static class ApplicationServiceRegistration
                 "Connection string 'DefaultConnection' is missing or empty."
             );
 
-        builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
+        builder.Services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseNpgsql(connectionString)
+        );
     }
 
     public static void AddApplicationServices(this WebApplicationBuilder builder)
@@ -51,7 +53,8 @@ public static class ApplicationServiceRegistration
             "vision-capture",
             client =>
             {
-                var timeoutSeconds = builder.Configuration.GetValue<int?>("Vision:CaptureTimeoutSeconds") ?? 35;
+                var timeoutSeconds =
+                    builder.Configuration.GetValue<int?>("Vision:CaptureTimeoutSeconds") ?? 35;
                 client.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 5, 120));
                 client.MaxResponseContentBufferSize = 1_000_000;
             }

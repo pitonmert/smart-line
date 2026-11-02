@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Infrastructure.Persistence;
 using SmartLine.API.Infrastructure.Realtime;
 using SmartLine.API.Shared;
@@ -12,8 +12,7 @@ public static class ProductEndpoints
 {
     public static RouteGroupBuilder MapProductEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app
-            .MapGroup("/api/products");
+        var group = app.MapGroup("/api/products");
         group.MapGet(
             "",
             async (int? pageNumber, int? pageSize, ProductHandler handler, CancellationToken ct) =>
@@ -38,29 +37,20 @@ public static class ProductEndpoints
                     : Results.Ok(ApiResponse<ProductResponse>.Success(product));
             }
         );
-        group
-            .MapPost(
-                "",
-                async (CreateProductRequest request, ProductHandler handler, CancellationToken ct) =>
-                {
-                    var product = await handler.CreateAsync(request, ct);
-                    return Results.Created(
-                        $"/api/products/{product.Id}",
-                        ApiResponse<ProductResponse>.Success(
-                            product,
-                            "Ürün başarıyla oluşturuldu"
-                        )
-                    );
-                }
-            );
+        group.MapPost(
+            "",
+            async (CreateProductRequest request, ProductHandler handler, CancellationToken ct) =>
+            {
+                var product = await handler.CreateAsync(request, ct);
+                return Results.Created(
+                    $"/api/products/{product.Id}",
+                    ApiResponse<ProductResponse>.Success(product, "Ürün başarıyla oluşturuldu")
+                );
+            }
+        );
         group.MapGet(
             "/defective",
-            async (
-                int? pageNumber,
-                int? pageSize,
-                ProductHandler handler,
-                CancellationToken ct
-            ) =>
+            async (int? pageNumber, int? pageSize, ProductHandler handler, CancellationToken ct) =>
                 Results.Ok(
                     ApiResponse<PagedResult<ProductResponse>>.Success(
                         await handler.DefectiveAsync(pageNumber ?? 1, pageSize ?? 10, ct)
@@ -101,12 +91,7 @@ public static class ProductEndpoints
                 EnumParser.TryParseDefined<ProductStatus>(status, out var parsed)
                     ? Results.Ok(
                         ApiResponse<PagedResult<ProductResponse>>.Success(
-                            await handler.ByStatusAsync(
-                                parsed,
-                                pageNumber ?? 1,
-                                pageSize ?? 10,
-                                ct
-                            )
+                            await handler.ByStatusAsync(parsed, pageNumber ?? 1, pageSize ?? 10, ct)
                         )
                     )
                     : Results.BadRequest(
@@ -128,12 +113,7 @@ public static class ProductEndpoints
                 EnumParser.TryParseDefined<ProductColor>(color, out var parsed)
                     ? Results.Ok(
                         ApiResponse<PagedResult<ProductResponse>>.Success(
-                            await handler.ByColorAsync(
-                                parsed,
-                                pageNumber ?? 1,
-                                pageSize ?? 10,
-                                ct
-                            )
+                            await handler.ByColorAsync(parsed, pageNumber ?? 1, pageSize ?? 10, ct)
                         )
                     )
                     : Results.BadRequest(
@@ -183,7 +163,8 @@ public sealed class ProductHandler(
             await db
                 .Products.AsNoTracking()
                 .FirstOrDefaultAsync(product => product.Barcode == barcode, ct)
-        ) is { } product
+        )
+            is { } product
             ? ToResponse(product)
             : null;
 
@@ -233,10 +214,7 @@ public sealed class ProductHandler(
         if (string.IsNullOrWhiteSpace(request.Barcode) || request.Barcode.Length > 50)
             throw new ValidationException("Barkod boş olamaz ve en fazla 50 karakter olabilir");
         if (!EnumParser.TryParseDefined<ProductStatus>(request.Status, out var status))
-            throw new ValidationException(
-                "Geçersiz ürün durumu",
-                ErrorCodes.ProductStatusInvalid
-            );
+            throw new ValidationException("Geçersiz ürün durumu", ErrorCodes.ProductStatusInvalid);
 
         ProductColor? color = null;
         if (!string.IsNullOrWhiteSpace(request.Color))

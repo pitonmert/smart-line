@@ -24,7 +24,11 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<Alert>(builder =>
         {
             builder.HasKey(e => e.Id);
-            builder.Property(e => e.AlertType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder
+                .Property(e => e.AlertType)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .IsRequired();
             builder.HasIndex(e => e.IsActive);
             builder.HasIndex(e => e.TriggeredAt);
             builder.HasIndex(e => e.AlertType);
@@ -75,7 +79,11 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<SystemLog>(builder =>
         {
             builder.HasKey(e => e.Id);
-            builder.Property(e => e.EventType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder
+                .Property(e => e.EventType)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .IsRequired();
             builder.Property(e => e.Severity).HasMaxLength(20).IsRequired();
             builder.HasIndex(e => e.CreatedAt);
             builder.HasIndex(e => e.Severity);
@@ -149,7 +157,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             builder.Property(e => e.CaptureMode).HasMaxLength(20).IsRequired();
             builder.Property(e => e.StoragePath).HasMaxLength(300).IsRequired();
             builder.HasIndex(e => e.Status);
-            builder.HasIndex(e => e.Status, "IX_DatasetSessions_OneActive").IsUnique().HasFilter("\"Status\" = 'ACTIVE'");
+            builder
+                .HasIndex(e => e.Status, "IX_DatasetSessions_OneActive")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'ACTIVE'");
             builder.HasIndex(e => e.StartedAt);
         });
     }

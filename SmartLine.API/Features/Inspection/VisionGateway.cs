@@ -56,22 +56,61 @@ public sealed record VisionProbeResult(
     string? SensorPid = null
 )
 {
-    public static VisionProbeResult NotConfigured() => new(false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static VisionProbeResult NotConfigured() =>
+        new(
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
 
-    public static VisionProbeResult Unreachable() => new(true, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static VisionProbeResult Unreachable() =>
+        new(
+            true,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
 }
 
 public static class VisionEndpoint
 {
     public static string? FrameUrl(string? healthUrl, string role)
     {
-        if (!Uri.TryCreate(healthUrl, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+        if (
+            !Uri.TryCreate(healthUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+        )
             return null;
-        var builder = new UriBuilder(uri)
-        {
-            Path = $"/frames/{role}",
-            Query = "",
-        };
+        var builder = new UriBuilder(uri) { Path = $"/frames/{role}", Query = "" };
         return builder.Uri.ToString();
     }
 
@@ -105,7 +144,9 @@ public static class VisionDiagnostics
             return NotConfigured;
         if (!probe.Reachable)
             return Offline;
-        return string.Equals(probe.Status, "healthy", StringComparison.OrdinalIgnoreCase) ? Online : Offline;
+        return string.Equals(probe.Status, "healthy", StringComparison.OrdinalIgnoreCase)
+            ? Online
+            : Offline;
     }
 
     public static string MapCamera(string visionStatus, VisionProbeResult probe)
@@ -121,7 +162,10 @@ public static class VisionDiagnostics
     }
 }
 
-public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<VisionEndpointOptions> options) : IVisionFrames
+public sealed class HttpVisionFrames(
+    IHttpClientFactory factory,
+    IOptions<VisionEndpointOptions> options
+) : IVisionFrames
 {
     public async Task<VisionCapturedFrame> ReadAsync(string role, CancellationToken ct)
     {
@@ -135,22 +179,44 @@ public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<Vision
             );
         }
 
-        var url = VisionEndpoint.FrameUrl(healthUrl, role)
-            ?? throw new ApiException(StatusCodes.Status503ServiceUnavailable, ErrorCodes.DatasetInvalid, "Vision:HealthUrl is not an absolute URL.");
+        var url =
+            VisionEndpoint.FrameUrl(healthUrl, role)
+            ?? throw new ApiException(
+                StatusCodes.Status503ServiceUnavailable,
+                ErrorCodes.DatasetInvalid,
+                "Vision:HealthUrl is not an absolute URL."
+            );
         var client = factory.CreateClient("vision-capture");
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         HttpResponseMessage response;
-        try { response = await client.SendAsync(request, ct); }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new ApiException(504, ErrorCodes.DatasetInvalid, "Camera capture timed out."); }
-        catch (HttpRequestException) { throw new ApiException(503, ErrorCodes.DatasetInvalid, "Vision cannot be reached."); }
+        try
+        {
+            response = await client.SendAsync(request, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ApiException(504, ErrorCodes.DatasetInvalid, "Camera capture timed out.");
+        }
+        catch (HttpRequestException)
+        {
+            throw new ApiException(503, ErrorCodes.DatasetInvalid, "Vision cannot be reached.");
+        }
         using var responseScope = response;
         if ((int)response.StatusCode == StatusCodes.Status409Conflict)
         {
             var errorCode = await ReadErrorCodeAsync(response, ct);
-            var message = errorCode == "frame_not_available"
-                ? "The camera has not produced a frame yet."
-                : AppendCode("High-quality still capture failed and preview fallback is disabled.", errorCode);
-            throw new ApiException(StatusCodes.Status409Conflict, ErrorCodes.DatasetInvalid, message);
+            var message =
+                errorCode == "frame_not_available"
+                    ? "The camera has not produced a frame yet."
+                    : AppendCode(
+                        "High-quality still capture failed and preview fallback is disabled.",
+                        errorCode
+                    );
+            throw new ApiException(
+                StatusCodes.Status409Conflict,
+                ErrorCodes.DatasetInvalid,
+                message
+            );
         }
 
         if (!response.IsSuccessStatusCode)
@@ -173,14 +239,20 @@ public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<Vision
             );
         }
 
-        var capturedAt = response.Headers.TryGetValues("X-Captured-At", out var stamps) && DateTimeOffset.TryParse(stamps.FirstOrDefault(), out var parsed)
-            ? parsed.UtcDateTime
-            : DateTime.UtcNow;
+        var capturedAt =
+            response.Headers.TryGetValues("X-Captured-At", out var stamps)
+            && DateTimeOffset.TryParse(stamps.FirstOrDefault(), out var parsed)
+                ? parsed.UtcDateTime
+                : DateTime.UtcNow;
         var origin = Header(response, "X-Frame-Origin") ?? "live_stream";
         var captureSource = Header(response, "X-Capture-Source");
         if (string.IsNullOrWhiteSpace(captureSource))
             captureSource = origin == "still_capture" ? "esp32_capture" : "mjpeg_preview";
-        var previewFallback = string.Equals(Header(response, "X-Preview-Fallback"), "true", StringComparison.OrdinalIgnoreCase);
+        var previewFallback = string.Equals(
+            Header(response, "X-Preview-Fallback"),
+            "true",
+            StringComparison.OrdinalIgnoreCase
+        );
         return new VisionCapturedFrame(
             bytes,
             capturedAt,
@@ -194,12 +266,18 @@ public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<Vision
     }
 
     private static int? HeaderInt(HttpResponseMessage response, string name) =>
-        response.Headers.TryGetValues(name, out var values) && int.TryParse(values.FirstOrDefault(), out var parsed) ? parsed : null;
+        response.Headers.TryGetValues(name, out var values)
+        && int.TryParse(values.FirstOrDefault(), out var parsed)
+            ? parsed
+            : null;
 
     private static string? Header(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault() : null;
 
-    private static async Task<string?> ReadErrorCodeAsync(HttpResponseMessage response, CancellationToken ct)
+    private static async Task<string?> ReadErrorCodeAsync(
+        HttpResponseMessage response,
+        CancellationToken ct
+    )
     {
         try
         {
@@ -209,7 +287,10 @@ public sealed class HttpVisionFrames(IHttpClientFactory factory, IOptions<Vision
             using var document = JsonDocument.Parse(body);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
                 return null;
-            if (document.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String)
+            if (
+                document.RootElement.TryGetProperty("error", out var error)
+                && error.ValueKind == JsonValueKind.String
+            )
                 return error.GetString();
         }
         catch (Exception)
@@ -272,7 +353,10 @@ public sealed class HttpVisionProbe(IHttpClientFactory factory) : IVisionProbe
                 camera?.Still?.CameraStatus?.SensorPid
             );
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception)
         {
             return VisionProbeResult.Unreachable();

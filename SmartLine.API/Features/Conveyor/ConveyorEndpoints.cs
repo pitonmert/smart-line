@@ -26,61 +26,56 @@ public static class ConveyorEndpoints
                     ApiResponse<ConveyorStatusResponse>.Success(await handler.GetStatusAsync(ct))
                 )
         );
-        group
-            .MapPost(
-                "/speed",
-                async (UpdateSpeedRequest request, ConveyorHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await handler.UpdateSpeedAsync(request, ct),
-                            $"Hız {request.Speed} olarak güncellendi"
-                        )
+        group.MapPost(
+            "/speed",
+            async (UpdateSpeedRequest request, ConveyorHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(
+                        await handler.UpdateSpeedAsync(request, ct),
+                        $"Hız {request.Speed} olarak güncellendi"
                     )
-            );
-        group
-            .MapPost(
-                "/start",
-                async (ConveyorHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await handler.StartAsync(ct),
-                            "Konveyör başlatıldı"
-                        )
+                )
+        );
+        group.MapPost(
+            "/start",
+            async (ConveyorHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(
+                        await handler.StartAsync(ct),
+                        "Konveyör başlatıldı"
                     )
-            );
-        group
-            .MapPost(
-                "/stop",
-                async (ConveyorHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await handler.StopAsync(ct),
-                            "Konveyör normal olarak durduruldu"
-                        )
+                )
+        );
+        group.MapPost(
+            "/stop",
+            async (ConveyorHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(
+                        await handler.StopAsync(ct),
+                        "Konveyör normal olarak durduruldu"
                     )
-            );
-        group
-            .MapPost(
-                "/emergency-stop",
-                async (ConveyorHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await handler.EmergencyStopAsync(ct),
-                            "Acil durdurma latch'i etkinleştirildi"
-                        )
+                )
+        );
+        group.MapPost(
+            "/emergency-stop",
+            async (ConveyorHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(
+                        await handler.EmergencyStopAsync(ct),
+                        "Acil durdurma latch'i etkinleştirildi"
                     )
-            );
-        group
-            .MapPost(
-                "/emergency-reset",
-                async (ConveyorHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await handler.EmergencyResetAsync(ct),
-                            "Acil durdurma latch'i sıfırlandı; konveyör durmaya devam ediyor"
-                        )
+                )
+        );
+        group.MapPost(
+            "/emergency-reset",
+            async (ConveyorHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(
+                        await handler.EmergencyResetAsync(ct),
+                        "Acil durdurma latch'i sıfırlandı; konveyör durmaya devam ediyor"
                     )
-            );
+                )
+        );
         return group;
     }
 }

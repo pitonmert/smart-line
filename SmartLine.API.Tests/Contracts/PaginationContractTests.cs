@@ -1,5 +1,5 @@
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Tests.Infrastructure;
 
 namespace SmartLine.API.Tests.Contracts;
@@ -151,13 +151,15 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
         Fixture.WithDbContextAsync(async db =>
         {
             var now = DateTime.UtcNow;
-            var products = Enumerable.Range(1, count).Select(index => new Product
-            {
-                Barcode = $"PAGE-{index:D3}",
-                Color = ProductColor.RED,
-                Status = status,
-                PassedAt = now.AddSeconds(-index),
-            });
+            var products = Enumerable
+                .Range(1, count)
+                .Select(index => new Product
+                {
+                    Barcode = $"PAGE-{index:D3}",
+                    Color = ProductColor.RED,
+                    Status = status,
+                    PassedAt = now.AddSeconds(-index),
+                });
             await db.Products.AddRangeAsync(products);
             await db.SaveChangesAsync();
         });
@@ -167,37 +169,42 @@ public sealed class PaginationContractTests(ApiFixture fixture) : ApiTestBase(fi
         {
             var timestamp = DateTime.UtcNow;
             await db.Products.AddRangeAsync(
-                Enumerable.Range(1, count).Select(index => new Product
-                {
-                    Barcode = $"FILTER-{index:D3}",
-                    Color = ProductColor.RED,
-                    Status = ProductStatus.NO_BARCODE,
-                    PassedAt = timestamp,
-                })
+                Enumerable
+                    .Range(1, count)
+                    .Select(index => new Product
+                    {
+                        Barcode = $"FILTER-{index:D3}",
+                        Color = ProductColor.RED,
+                        Status = ProductStatus.NO_BARCODE,
+                        PassedAt = timestamp,
+                    })
             );
             await db.Alerts.AddRangeAsync(
-                Enumerable.Range(1, count).Select(_ => new Alert
-                {
-                    AlertType = AlertType.FIRE,
-                    IsActive = true,
-                    TriggeredAt = timestamp,
-                })
+                Enumerable
+                    .Range(1, count)
+                    .Select(_ => new Alert
+                    {
+                        AlertType = AlertType.FIRE,
+                        IsActive = true,
+                        TriggeredAt = timestamp,
+                    })
             );
             await db.SystemLogs.AddRangeAsync(
-                Enumerable.Range(1, count).Select(_ => new SystemLog
-                {
-                    EventType = EventType.PRODUCT_PASSED,
-                    Severity = "Info",
-                    CreatedAt = timestamp,
-                })
+                Enumerable
+                    .Range(1, count)
+                    .Select(_ => new SystemLog
+                    {
+                        EventType = EventType.PRODUCT_PASSED,
+                        Severity = "Info",
+                        CreatedAt = timestamp,
+                    })
             );
             await db.SaveChangesAsync();
         });
 
     private static void AssertDescendingIds(JsonElement page)
     {
-        var ids = page
-            .GetProperty("items")
+        var ids = page.GetProperty("items")
             .EnumerateArray()
             .Select(item => item.GetProperty("id").GetInt32())
             .ToArray();

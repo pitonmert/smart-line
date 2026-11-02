@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Features.Monitoring;
 using SmartLine.API.Features.Safety;
 using SmartLine.API.Infrastructure.Persistence;
@@ -12,23 +12,21 @@ public static class BarcodeEndpoints
 {
     public static RouteGroupBuilder MapBarcodeEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app
-            .MapGroup("/api/sensors");
-        group
-            .MapPost(
-                "/barcode",
-                async (BarcodeReading request, BarcodeHandler handler, CancellationToken ct) =>
-                {
-                    await handler.HandleAsync(request, ct);
-                    return Results.Ok(
-                        ApiResponse<string>.Success(
-                            string.IsNullOrEmpty(request.Barcode)
-                                ? "Barkod okunamadı — ürün kaydedildi (NO_BARCODE)"
-                                : $"Ürün kaydedildi: {request.Barcode}"
-                        )
-                    );
-                }
-            );
+        var group = app.MapGroup("/api/sensors");
+        group.MapPost(
+            "/barcode",
+            async (BarcodeReading request, BarcodeHandler handler, CancellationToken ct) =>
+            {
+                await handler.HandleAsync(request, ct);
+                return Results.Ok(
+                    ApiResponse<string>.Success(
+                        string.IsNullOrEmpty(request.Barcode)
+                            ? "Barkod okunamadı — ürün kaydedildi (NO_BARCODE)"
+                            : $"Ürün kaydedildi: {request.Barcode}"
+                    )
+                );
+            }
+        );
         return group;
     }
 }

@@ -15,48 +15,39 @@ public static class SensorSafetyEndpoints
     public static RouteGroupBuilder MapSensorSafetyEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/sensors");
-        group
-            .MapPost(
-                "/environment",
-                async (
-                    EnvironmentReading request,
-                    EnvironmentHandler handler,
-                    CancellationToken ct
-                ) =>
-                {
-                    await handler.HandleAsync(request, ct);
-                    return Results.Ok(
-                        ApiResponse<string>.Success(
-                            $"Ortam verisi kaydedildi: {request.Temperature}°C, %{request.Humidity}"
-                        )
-                    );
-                }
-            );
-        group
-            .MapPost(
-                "/fire",
-                async (FireReading request, FireHandler handler, CancellationToken ct) =>
-                {
-                    await handler.HandleAsync(request, ct);
-                    return Results.Ok(
-                        ApiResponse<string>.Success(
-                            request.IsDetected
-                                ? "YANGIN ALARMI! Acil durdurma latch'i etkin."
-                                : "Yangın sensörü temiz; latch yönetici resetini bekliyor"
-                        )
-                    );
-                }
-            );
-        group
-            .MapGet(
-                "/status",
-                async (ConveyorHandler conveyor, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<ConveyorStatusResponse>.Success(
-                            await conveyor.GetStatusAsync(ct)
-                        )
+        group.MapPost(
+            "/environment",
+            async (EnvironmentReading request, EnvironmentHandler handler, CancellationToken ct) =>
+            {
+                await handler.HandleAsync(request, ct);
+                return Results.Ok(
+                    ApiResponse<string>.Success(
+                        $"Ortam verisi kaydedildi: {request.Temperature}°C, %{request.Humidity}"
                     )
-            );
+                );
+            }
+        );
+        group.MapPost(
+            "/fire",
+            async (FireReading request, FireHandler handler, CancellationToken ct) =>
+            {
+                await handler.HandleAsync(request, ct);
+                return Results.Ok(
+                    ApiResponse<string>.Success(
+                        request.IsDetected
+                            ? "YANGIN ALARMI! Acil durdurma latch'i etkin."
+                            : "Yangın sensörü temiz; latch yönetici resetini bekliyor"
+                    )
+                );
+            }
+        );
+        group.MapGet(
+            "/status",
+            async (ConveyorHandler conveyor, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<ConveyorStatusResponse>.Success(await conveyor.GetStatusAsync(ct))
+                )
+        );
         return group;
     }
 }

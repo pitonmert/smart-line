@@ -13,10 +13,24 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
     {
         await Fixture.WithDbContextAsync(db => ContractSeeder.EnsureAsync(db));
         var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !Directory.Exists(Path.Combine(root.FullName, "test-support", "vision"))) root = root.Parent;
+        while (
+            root is not null
+            && !Directory.Exists(Path.Combine(root.FullName, "test-support", "vision"))
+        )
+            root = root.Parent;
         Assert.NotNull(root);
-        using var server = Process.Start(new ProcessStartInfo("python3", Path.Combine(root.FullName, "test-support", "vision", "inspection_server.py"))
-        { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, Environment = { ["SMARTLINE_TEST_CAPTURE_DELAY"] = "3.2" } })!;
+        using var server = Process.Start(
+            new ProcessStartInfo(
+                "python3",
+                Path.Combine(root.FullName, "test-support", "vision", "inspection_server.py")
+            )
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                Environment = { ["SMARTLINE_TEST_CAPTURE_DELAY"] = "3.2" },
+            }
+        )!;
         var serverErrors = server.StandardError.ReadToEndAsync();
         var options = Fixture.GetRequiredService<IOptions<VisionEndpointOptions>>().Value;
         var oldUrl = options.HealthUrl;
@@ -25,7 +39,9 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
             string? port = null;
             try
             {
-                port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
+                port = await server
+                    .StandardOutput.ReadLineAsync()
+                    .WaitAsync(TimeSpan.FromSeconds(10));
             }
             catch (TimeoutException)
             {
@@ -33,26 +49,47 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
             }
             if (!int.TryParse(port, out var portNumber) || portNumber is < 1 or > 65535)
             {
-                if (!server.HasExited) server.Kill(true);
+                if (!server.HasExited)
+                    server.Kill(true);
                 await server.WaitForExitAsync();
-                Assert.Fail($"Vision server did not return a valid port within 10 seconds. Exit code: {server.ExitCode}.\nStandard output: {port ?? "<none>"}\nStandard error:\n{await serverErrors}");
+                Assert.Fail(
+                    $"Vision server did not return a valid port within 10 seconds. Exit code: {server.ExitCode}.\nStandard output: {port ?? "<none>"}\nStandard error:\n{await serverErrors}"
+                );
             }
             options.HealthUrl = $"http://127.0.0.1:{port}/health";
             var client = Fixture.CreateClient();
             var id = Guid.NewGuid();
-            var initial = await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = id });
-            Assert.True(initial.StatusCode == HttpStatusCode.Created, await initial.Content.ReadAsStringAsync());
+            var initial = await client.PostAsJsonAsync(
+                "/api/inspections/vision",
+                new { requestId = id }
+            );
+            Assert.True(
+                initial.StatusCode == HttpStatusCode.Created,
+                await initial.Content.ReadAsStringAsync()
+            );
             var first = await AssertSuccessAsync(initial, HttpStatusCode.Created);
-            Assert.Equal("model", first.GetProperty("inspection").GetProperty("observationSource").GetString());
-            var again = await AssertSuccessAsync(await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = id }));
+            Assert.Equal(
+                "model",
+                first.GetProperty("inspection").GetProperty("observationSource").GetString()
+            );
+            var again = await AssertSuccessAsync(
+                await client.PostAsJsonAsync("/api/inspections/vision", new { requestId = id })
+            );
             Assert.Equal(id, again.GetProperty("inspection").GetProperty("inspectionId").GetGuid());
-            Assert.Equal(1, await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync()));
-            Assert.Equal(1, await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync()));
+            Assert.Equal(
+                1,
+                await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync())
+            );
+            Assert.Equal(
+                1,
+                await Fixture.WithDbContextAsync(db => db.InspectionRecords.CountAsync())
+            );
         }
         finally
         {
             options.HealthUrl = oldUrl;
-            if (!server.HasExited) server.Kill(true);
+            if (!server.HasExited)
+                server.Kill(true);
             await server.WaitForExitAsync();
             await serverErrors;
         }

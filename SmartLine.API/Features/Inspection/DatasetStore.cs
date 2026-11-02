@@ -54,7 +54,10 @@ public sealed record DatasetSampleResponse(
     bool PreviewFallback = false
 );
 
-public sealed record DatasetCaptureResult(DatasetSessionResponse Session, DatasetSampleResponse Sample);
+public sealed record DatasetCaptureResult(
+    DatasetSessionResponse Session,
+    DatasetSampleResponse Sample
+);
 
 public sealed record DatasetCaptureDetails(
     string? ProductClass = null,
@@ -90,8 +93,24 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         int? intervalMs,
         bool simulation,
         CancellationToken ct
-    )
-    => await WriteAsync(() => StartCoreAsync(recipeId, productClass, qualityLabel, colorLabel, sizeLabel, defectLabels, notes, captureMode, intervalMs, simulation, ct), ct);
+    ) =>
+        await WriteAsync(
+            () =>
+                StartCoreAsync(
+                    recipeId,
+                    productClass,
+                    qualityLabel,
+                    colorLabel,
+                    sizeLabel,
+                    defectLabels,
+                    notes,
+                    captureMode,
+                    intervalMs,
+                    simulation,
+                    ct
+                ),
+            ct
+        );
 
     private async Task<DatasetSessionResponse> StartCoreAsync(
         Guid? recipeId,
@@ -113,7 +132,11 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
                 "Capture mode must be manual, interval, or hardware.",
                 ErrorCodes.DatasetInvalid
             );
-        if (mode == "hardware" && !simulation) throw new ValidationException("Hardware capture is not integrated.", ErrorCodes.DatasetInvalid);
+        if (mode == "hardware" && !simulation)
+            throw new ValidationException(
+                "Hardware capture is not integrated.",
+                ErrorCodes.DatasetInvalid
+            );
         if (mode == "interval" && (intervalMs is null or < 200 or > 60_000))
             throw new ValidationException(
                 "Interval capture must be between 200 and 60000 milliseconds.",
@@ -128,7 +151,9 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
 
         var recipe = recipeId is null
             ? await db.ProductRecipes.AsNoTracking().FirstOrDefaultAsync(item => item.IsActive, ct)
-            : await db.ProductRecipes.AsNoTracking().FirstOrDefaultAsync(item => item.Id == recipeId, ct);
+            : await db
+                .ProductRecipes.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == recipeId, ct);
         if (recipe is null)
             throw new NotFoundException("Product recipe");
 
@@ -142,7 +167,9 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             QualityLabel = Normalize(qualityLabel),
             ColorLabel = Normalize(colorLabel),
             SizeLabel = Normalize(sizeLabel),
-            DefectLabelsJson = InspectionJson.Serialize(defectLabels.Select(Normalize).Where(item => item.Length > 0).Distinct().ToList()),
+            DefectLabelsJson = InspectionJson.Serialize(
+                defectLabels.Select(Normalize).Where(item => item.Length > 0).Distinct().ToList()
+            ),
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             CaptureMode = mode,
             IntervalMs = mode == "interval" ? intervalMs : null,
@@ -151,7 +178,18 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             StartedAt = DateTime.UtcNow,
             IsSimulation = simulation,
         };
-        await ApplyLabelsAsync(session, new DatasetCaptureDetails(productClass, qualityLabel, colorLabel, sizeLabel, defectLabels, notes), ct);
+        await ApplyLabelsAsync(
+            session,
+            new DatasetCaptureDetails(
+                productClass,
+                qualityLabel,
+                colorLabel,
+                sizeLabel,
+                defectLabels,
+                notes
+            ),
+            ct
+        );
         session.StoragePath = Path.Combine(Root(), session.Id.ToString("N"));
         Directory.CreateDirectory(Path.Combine(session.StoragePath, "images"));
         await File.WriteAllTextAsync(
@@ -166,14 +204,17 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         static string sessionPath(Guid id) => id.ToString("N");
     }
 
-    public async Task<DatasetSessionResponse> StopAsync(Guid sessionId, CancellationToken ct)
-    => await WriteAsync(() => StopCoreAsync(sessionId, ct), ct, sessionId);
+    public async Task<DatasetSessionResponse> StopAsync(Guid sessionId, CancellationToken ct) =>
+        await WriteAsync(() => StopCoreAsync(sessionId, ct), ct, sessionId);
 
     private async Task<DatasetSessionResponse> StopCoreAsync(Guid sessionId, CancellationToken ct)
     {
         var session = await RequiredAsync(sessionId, ct);
         if (session.Status != "ACTIVE")
-            throw new ValidationException("The dataset session is already stopped.", ErrorCodes.DatasetInvalid);
+            throw new ValidationException(
+                "The dataset session is already stopped.",
+                ErrorCodes.DatasetInvalid
+            );
         session.Status = "STOPPED";
         session.StoppedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -186,8 +227,12 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         string? sourceFileName,
         DatasetCaptureDetails? details,
         CancellationToken ct
-    )
-    => await WriteAsync(() => CaptureCoreAsync(sessionId, image, sourceFileName, details, ct), ct, sessionId);
+    ) =>
+        await WriteAsync(
+            () => CaptureCoreAsync(sessionId, image, sourceFileName, details, ct),
+            ct,
+            sessionId
+        );
 
     private async Task<DatasetCaptureResult> CaptureCoreAsync(
         Guid sessionId,
@@ -199,24 +244,52 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
     {
         var session = await RequiredAsync(sessionId, ct);
         if (session.Status != "ACTIVE")
-            throw new ValidationException("The dataset session is stopped.", ErrorCodes.DatasetInvalid);
+            throw new ValidationException(
+                "The dataset session is stopped.",
+                ErrorCodes.DatasetInvalid
+            );
         if (session.CaptureMode == "hardware" && !session.IsSimulation)
             throw new ValidationException(
                 "Hardware-trigger capture is reserved for a future VL53L1X event. Use manual capture or mark the session as simulation.",
                 ErrorCodes.DatasetInvalid
             );
         if (image.Length == 0 || image.Length > 900_000)
-            throw new ValidationException("Image must be a non-empty file under 900 KB.", ErrorCodes.DatasetInvalid);
+            throw new ValidationException(
+                "Image must be a non-empty file under 900 KB.",
+                ErrorCodes.DatasetInvalid
+            );
         // Vision owns image decoding; the API checks the camera payload before storing it.
-        if (image.Length < 4 || image[0] != 0xFF || image[1] != 0xD8 || image[2] != 0xFF
-            || image[^2] != 0xFF || image[^1] != 0xD9)
-            throw new ValidationException("Vision must return a JPEG frame.", ErrorCodes.DatasetInvalid);
+        if (
+            image.Length < 4
+            || image[0] != 0xFF
+            || image[1] != 0xD8
+            || image[2] != 0xFF
+            || image[^2] != 0xFF
+            || image[^1] != 0xD9
+        )
+            throw new ValidationException(
+                "Vision must return a JPEG frame.",
+                ErrorCodes.DatasetInvalid
+            );
         var capture = details ?? new DatasetCaptureDetails();
         var gate = Gates.GetOrAdd(session.Id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try
         {
-            await ApplyLabelsAsync(session, capture.ReplaceLabels ? capture : new DatasetCaptureDetails(session.ProductClass, session.QualityLabel, session.ColorLabel, session.SizeLabel, InspectionJson.Deserialize<List<string>>(session.DefectLabelsJson), session.Notes), ct);
+            await ApplyLabelsAsync(
+                session,
+                capture.ReplaceLabels
+                    ? capture
+                    : new DatasetCaptureDetails(
+                        session.ProductClass,
+                        session.QualityLabel,
+                        session.ColorLabel,
+                        session.SizeLabel,
+                        InspectionJson.Deserialize<List<string>>(session.DefectLabelsJson),
+                        session.Notes
+                    ),
+                ct
+            );
             var sampleId = Guid.NewGuid();
             var capturedAt = DateTime.UtcNow;
             var fileName = $"{capturedAt:yyyyMMddTHHmmssfff}-{sampleId:N}.jpg";
@@ -262,8 +335,14 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
                 PreviewFallback: capture.PreviewFallback
             );
             var manifestPath = Path.Combine(session.StoragePath, "manifest.jsonl");
-            var previous = File.Exists(manifestPath) ? await File.ReadAllTextAsync(manifestPath, ct) : "";
-            await AtomicWriteAsync(manifestPath, previous + InspectionJson.Serialize(entry) + "\n", ct);
+            var previous = File.Exists(manifestPath)
+                ? await File.ReadAllTextAsync(manifestPath, ct)
+                : "";
+            await AtomicWriteAsync(
+                manifestPath,
+                previous + InspectionJson.Serialize(entry) + "\n",
+                ct
+            );
             var entries = await ReadManifestAsync(session);
             session.ImageCount = entries.Count(item => !item.Rejected);
             await db.SaveChangesAsync(ct);
@@ -277,27 +356,41 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         }
     }
 
-    public async Task<DatasetSessionResponse> RejectAsync(Guid sessionId, Guid sampleId, CancellationToken ct)
-    => await WriteAsync(() => RejectCoreAsync(sessionId, sampleId, ct), ct, sessionId);
+    public async Task<DatasetSessionResponse> RejectAsync(
+        Guid sessionId,
+        Guid sampleId,
+        CancellationToken ct
+    ) => await WriteAsync(() => RejectCoreAsync(sessionId, sampleId, ct), ct, sessionId);
 
-    private async Task<DatasetSessionResponse> RejectCoreAsync(Guid sessionId, Guid sampleId, CancellationToken ct)
+    private async Task<DatasetSessionResponse> RejectCoreAsync(
+        Guid sessionId,
+        Guid sampleId,
+        CancellationToken ct
+    )
     {
         var session = await RequiredAsync(sessionId, ct);
         if (session.Status != "ACTIVE")
-            throw new ValidationException("A stopped dataset session cannot discard captures.", ErrorCodes.DatasetInvalid);
+            throw new ValidationException(
+                "A stopped dataset session cannot discard captures.",
+                ErrorCodes.DatasetInvalid
+            );
         var gate = Gates.GetOrAdd(session.Id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try
         {
             var entries = await ReadManifestAsync(session);
-            var target = entries.FirstOrDefault(item => item.SampleId == sampleId && !item.Rejected);
+            var target = entries.FirstOrDefault(item =>
+                item.SampleId == sampleId && !item.Rejected
+            );
             if (target is null)
                 throw new NotFoundException("Dataset sample", sampleId);
             var fileName = Path.GetFileName(target.FileName);
             var fullPath = Path.Combine(session.StoragePath, "images", fileName);
             // Dosya commit sonrasında kaldırılır; hata olursa manifest geri yüklenebilir.
             _pendingDelete = fullPath;
-            var updated = entries.Select(item => item.SampleId == sampleId ? item with { Rejected = true } : item).ToList();
+            var updated = entries
+                .Select(item => item.SampleId == sampleId ? item with { Rejected = true } : item)
+                .ToList();
             var manifestPath = Path.Combine(session.StoragePath, "manifest.jsonl");
             var body = string.Join('\n', updated.Select(InspectionJson.Serialize));
             if (body.Length > 0)
@@ -315,13 +408,20 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
 
     public async Task<DatasetSessionResponse?> GetAsync(Guid sessionId, CancellationToken ct)
     {
-        var session = await db.DatasetSessions.AsNoTracking().FirstOrDefaultAsync(item => item.Id == sessionId, ct);
+        var session = await db
+            .DatasetSessions.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == sessionId, ct);
         return session is null ? null : await RespondAsync(session);
     }
 
     public async Task<IReadOnlyList<DatasetSessionResponse>> ListAsync(CancellationToken ct)
     {
-        var sessions = await db.DatasetSessions.AsNoTracking().OrderByDescending(item => item.Status == "ACTIVE").ThenByDescending(item => item.StartedAt).Take(50).ToListAsync(ct);
+        var sessions = await db
+            .DatasetSessions.AsNoTracking()
+            .OrderByDescending(item => item.Status == "ACTIVE")
+            .ThenByDescending(item => item.StartedAt)
+            .Take(50)
+            .ToListAsync(ct);
         var results = new List<DatasetSessionResponse>(sessions.Count);
         foreach (var session in sessions)
             results.Add(await RespondAsync(session));
@@ -334,7 +434,9 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         CancellationToken ct
     )
     {
-        var session = await db.DatasetSessions.AsNoTracking().FirstOrDefaultAsync(item => item.Id == sessionId, ct);
+        var session = await db
+            .DatasetSessions.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == sessionId, ct);
         if (session is null)
             return null;
         var safeName = Path.GetFileName(fileName);
@@ -344,7 +446,9 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         if (!File.Exists(path))
             return null;
         var bytes = await File.ReadAllBytesAsync(path, ct);
-        var type = safeName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+        var type = safeName.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            ? "image/png"
+            : "image/jpeg";
         return (bytes, type);
     }
 
@@ -355,7 +459,10 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
     private async Task<DatasetSessionResponse> RespondAsync(DatasetSession session) =>
         ToResponse(session, await ReadManifestAsync(session));
 
-    private static DatasetSessionResponse ToResponse(DatasetSession session, IReadOnlyList<DatasetManifestEntry> entries)
+    private static DatasetSessionResponse ToResponse(
+        DatasetSession session,
+        IReadOnlyList<DatasetManifestEntry> entries
+    )
     {
         var defects = InspectionJson.Deserialize<List<string>>(session.DefectLabelsJson);
         var active = entries.Where(item => !item.Rejected).ToList();
@@ -374,12 +481,20 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             session.CaptureMode,
             session.IntervalMs,
             active.Count,
-            Count(active, item => string.IsNullOrWhiteSpace(item.ProductClass) ? "(unlabeled)" : item.ProductClass),
+            Count(
+                active,
+                item =>
+                    string.IsNullOrWhiteSpace(item.ProductClass) ? "(unlabeled)" : item.ProductClass
+            ),
             session.StartedAt,
             session.StoppedAt,
             session.IsSimulation,
             labelStatus + "; bounding boxes are not inferred",
-            Count(active, item => string.IsNullOrWhiteSpace(item.QualityLabel) ? "(unlabeled)" : item.QualityLabel),
+            Count(
+                active,
+                item =>
+                    string.IsNullOrWhiteSpace(item.QualityLabel) ? "(unlabeled)" : item.QualityLabel
+            ),
             CountDefects(active),
             active.OrderByDescending(item => item.CapturedAt).Take(12).Select(ToSample).ToList()
         );
@@ -404,29 +519,55 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             entry.PreviewFallback
         );
 
-    private async Task ApplyLabelsAsync(DatasetSession session, DatasetCaptureDetails details, CancellationToken ct)
+    private async Task ApplyLabelsAsync(
+        DatasetSession session,
+        DatasetCaptureDetails details,
+        CancellationToken ct
+    )
     {
         if (session.RecipeId is null)
-            throw new ValidationException("The dataset session has no product recipe.", ErrorCodes.DatasetInvalid);
-        var recipe = await db.ProductRecipes.AsNoTracking().FirstOrDefaultAsync(item => item.Id == session.RecipeId, ct)
+            throw new ValidationException(
+                "The dataset session has no product recipe.",
+                ErrorCodes.DatasetInvalid
+            );
+        var recipe =
+            await db
+                .ProductRecipes.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == session.RecipeId, ct)
             ?? throw new NotFoundException("Product recipe", session.RecipeId);
         var definition = InspectionJson.Deserialize<ProductRecipeDefinition>(recipe.DefinitionJson);
         var product = Normalize(details.ProductClass);
         var quality = Normalize(details.QualityLabel);
         var color = Normalize(details.ColorLabel);
         var size = Normalize(details.SizeLabel);
-        var defects = (details.DefectLabels ?? []).Select(Normalize).Where(item => item.Length > 0).Distinct().ToList();
+        var defects = (details.DefectLabels ?? [])
+            .Select(Normalize)
+            .Where(item => item.Length > 0)
+            .Distinct()
+            .ToList();
         var errors = new List<string>();
-        if (details.Notes?.Length > 1000) errors.Add("Notes exceed 1000 characters.");
-        if (definition.ProductClasses.Count > 0 && definition.ProductClasses.All(item => item.Code != product))
+        if (details.Notes?.Length > 1000)
+            errors.Add("Notes exceed 1000 characters.");
+        if (
+            definition.ProductClasses.Count > 0
+            && definition.ProductClasses.All(item => item.Code != product)
+        )
             errors.Add("Product class is not defined by the recipe.");
         if (quality is not (InspectionVocabulary.Good or InspectionVocabulary.Defective))
             errors.Add("Quality label must be GOOD or DEFECTIVE.");
-        if (definition.AllowedColors.Count > 0 && definition.AllowedColors.All(item => item.Code != color))
+        if (
+            definition.AllowedColors.Count > 0
+            && definition.AllowedColors.All(item => item.Code != color)
+        )
             errors.Add("Color is not defined by the recipe.");
-        if (definition.SizeClasses.Count > 0 && definition.SizeClasses.All(item => item.Code != size))
+        if (
+            definition.SizeClasses.Count > 0
+            && definition.SizeClasses.All(item => item.Code != size)
+        )
             errors.Add("Size is not defined by the recipe.");
-        var knownDefects = definition.DefectClasses.Select(item => item.Code).ToHashSet(StringComparer.Ordinal);
+        var knownDefects = definition
+            .DefectClasses.Select(item => item.Code)
+            .ToHashSet(StringComparer.Ordinal);
         if (defects.Any(item => !knownDefects.Contains(item)))
             errors.Add("A defect label is not defined by the recipe.");
         if (errors.Count > 0)
@@ -450,7 +591,10 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         {
             if (string.IsNullOrWhiteSpace(line))
                 continue;
-            var entry = JsonSerializer.Deserialize<DatasetManifestEntry>(line, InspectionJson.Options);
+            var entry = JsonSerializer.Deserialize<DatasetManifestEntry>(
+                line,
+                InspectionJson.Options
+            );
             if (entry is not null)
                 entries.Add(entry);
         }
@@ -458,7 +602,10 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
         return entries;
     }
 
-    private static Dictionary<string, int> Count(IEnumerable<DatasetManifestEntry> entries, Func<DatasetManifestEntry, string> key)
+    private static Dictionary<string, int> Count(
+        IEnumerable<DatasetManifestEntry> entries,
+        Func<DatasetManifestEntry, string> key
+    )
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var entry in entries)
@@ -491,35 +638,47 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
     public async Task RecoverAsync(CancellationToken ct)
     {
         // Yeniden başlatmada manifest esas alınır; yarım kalan dosyalar ve sayaçlar uzlaştırılır.
-        await WriteAsync(async () =>
-        {
-            var sessions = await db.DatasetSessions.ToListAsync(ct);
-            foreach (var session in sessions)
+        await WriteAsync(
+            async () =>
             {
-                Directory.CreateDirectory(Path.Combine(session.StoragePath, "images"));
-                var entries = await ReadManifestAsync(session);
-                var active = entries.Where(e => !e.Rejected).ToList();
-                if (active.Any(e => !File.Exists(Path.Combine(session.StoragePath, e.FileName))))
+                var sessions = await db.DatasetSessions.ToListAsync(ct);
+                foreach (var session in sessions)
                 {
-                    // Dataset kaybı diğer API işlevlerinin açılmasını engellemez.
-                    session.Status = "RECOVERY_REQUIRED";
-                    session.StoppedAt ??= DateTime.UtcNow;
+                    Directory.CreateDirectory(Path.Combine(session.StoragePath, "images"));
+                    var entries = await ReadManifestAsync(session);
+                    var active = entries.Where(e => !e.Rejected).ToList();
+                    if (
+                        active.Any(e => !File.Exists(Path.Combine(session.StoragePath, e.FileName)))
+                    )
+                    {
+                        // Dataset kaybı diğer API işlevlerinin açılmasını engellemez.
+                        session.Status = "RECOVERY_REQUIRED";
+                        session.StoppedAt ??= DateTime.UtcNow;
+                        session.ImageCount = active.Count;
+                        continue;
+                    }
+                    var kept = active.Select(e => Path.GetFileName(e.FileName)).ToHashSet();
+                    foreach (
+                        var file in Directory.GetFiles(Path.Combine(session.StoragePath, "images"))
+                    )
+                        if (!kept.Contains(Path.GetFileName(file)))
+                            File.Delete(file);
                     session.ImageCount = active.Count;
-                    continue;
                 }
-                var kept = active.Select(e => Path.GetFileName(e.FileName)).ToHashSet();
-                foreach (var file in Directory.GetFiles(Path.Combine(session.StoragePath, "images")))
-                    if (!kept.Contains(Path.GetFileName(file))) File.Delete(file);
-                session.ImageCount = active.Count;
-            }
-            await db.SaveChangesAsync(ct);
-            return true;
-        }, ct);
+                await db.SaveChangesAsync(ct);
+                return true;
+            },
+            ct
+        );
     }
 
     private string? _pendingDelete;
 
-    private async Task<T> WriteAsync<T>(Func<Task<T>> action, CancellationToken ct, Guid? sessionId = null)
+    private async Task<T> WriteAsync<T>(
+        Func<Task<T>> action,
+        CancellationToken ct,
+        Guid? sessionId = null
+    )
     {
         await Writes.WaitAsync(ct);
         try
@@ -527,38 +686,70 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             await using var transaction = await InspectionTransaction.BeginAsync(db, ct);
             var root = Root();
             var folders = Directory.GetDirectories(root).ToHashSet();
-            var scope = sessionId is null ? null : Path.Combine(root, sessionId.Value.ToString("N"));
-            var files = scope is not null && Directory.Exists(scope) ? Directory.GetFiles(scope, "*", SearchOption.AllDirectories) : [];
-            var manifests = files.Where(path => path.EndsWith(".json") || path.EndsWith(".jsonl"))
+            var scope = sessionId is null
+                ? null
+                : Path.Combine(root, sessionId.Value.ToString("N"));
+            var files =
+                scope is not null && Directory.Exists(scope)
+                    ? Directory.GetFiles(scope, "*", SearchOption.AllDirectories)
+                    : [];
+            var manifests = files
+                .Where(path => path.EndsWith(".json") || path.EndsWith(".jsonl"))
                 .ToDictionary(path => path, File.ReadAllBytes);
             var images = files.ToHashSet();
             try
             {
                 var result = await action();
                 foreach (var entry in db.ChangeTracker.Entries<DatasetSession>())
-                    await AtomicWriteAsync(Path.Combine(entry.Entity.StoragePath, "session.json"), InspectionJson.Serialize(await RespondAsync(entry.Entity)), ct);
+                    await AtomicWriteAsync(
+                        Path.Combine(entry.Entity.StoragePath, "session.json"),
+                        InspectionJson.Serialize(await RespondAsync(entry.Entity)),
+                        ct
+                    );
                 await transaction.CommitAsync(ct);
                 // Commit başarılı; silinemeyen gereksiz dosya manifestte rejected kalır.
                 if (_pendingDelete is not null)
                 {
-                    try { File.Delete(_pendingDelete); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+                    try
+                    {
+                        File.Delete(_pendingDelete);
+                    }
+                    catch (Exception error)
+                        when (error is IOException or UnauthorizedAccessException) { }
                 }
                 return result;
             }
             catch
             {
-                foreach (var path in scope is not null && Directory.Exists(scope) ? Directory.GetFiles(scope, "*", SearchOption.AllDirectories) : [])
-                    if (!images.Contains(path)) File.Delete(path);
+                foreach (
+                    var path in scope is not null && Directory.Exists(scope)
+                        ? Directory.GetFiles(scope, "*", SearchOption.AllDirectories)
+                        : []
+                )
+                    if (!images.Contains(path))
+                        File.Delete(path);
                 foreach (var item in manifests)
                     await File.WriteAllBytesAsync(item.Key, item.Value, CancellationToken.None);
                 foreach (var folder in Directory.GetDirectories(root))
-                    if (!folders.Contains(folder)) Directory.Delete(folder, true);
+                    if (!folders.Contains(folder))
+                        Directory.Delete(folder, true);
                 throw;
             }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        { throw new ApiException(503, ErrorCodes.DatasetInvalid, "Dataset storage is unavailable. Check storage and backup status.", error); }
-        finally { _pendingDelete = null; Writes.Release(); }
+        {
+            throw new ApiException(
+                503,
+                ErrorCodes.DatasetInvalid,
+                "Dataset storage is unavailable. Check storage and backup status.",
+                error
+            );
+        }
+        finally
+        {
+            _pendingDelete = null;
+            Writes.Release();
+        }
     }
 
     private static async Task AtomicWriteAsync(string path, string body, CancellationToken ct)
@@ -569,14 +760,21 @@ public sealed class DatasetStore(ApplicationDbContext db, IOptions<DatasetOption
             await File.WriteAllTextAsync(temporary, body, new UTF8Encoding(false), ct);
             File.Move(temporary, path, true);
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
     }
 
     private string Root()
     {
         var root = options.Value.Root;
         if (string.IsNullOrWhiteSpace(root))
-            throw new ValidationException("Dataset root is not configured.", ErrorCodes.DatasetInvalid);
+            throw new ValidationException(
+                "Dataset root is not configured.",
+                ErrorCodes.DatasetInvalid
+            );
         Directory.CreateDirectory(root);
         return Path.GetFullPath(root);
     }

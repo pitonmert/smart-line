@@ -6,7 +6,10 @@ namespace SmartLine.API.Features.Inspection;
 
 internal static class InspectionTransaction
 {
-    public static async Task<IDbContextTransaction> BeginAsync(ApplicationDbContext db, CancellationToken ct)
+    public static async Task<IDbContextTransaction> BeginAsync(
+        ApplicationDbContext db,
+        CancellationToken ct
+    )
     {
         var transaction = await db.Database.BeginTransactionAsync(ct);
         try
@@ -15,6 +18,10 @@ internal static class InspectionTransaction
             await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(20261024)", ct);
             return transaction;
         }
-        catch { await transaction.DisposeAsync(); throw; }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
     }
 }

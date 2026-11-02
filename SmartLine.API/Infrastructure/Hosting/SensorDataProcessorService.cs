@@ -62,7 +62,9 @@ public sealed class SensorDataProcessorService(
             if (
                 JsonSerializer.Deserialize<FireReading>(message.Payload, JsonOptions) is { } reading
             )
-                await scope.ServiceProvider.GetRequiredService<FireHandler>().HandleAsync(reading, ct);
+                await scope
+                    .ServiceProvider.GetRequiredService<FireHandler>()
+                    .HandleAsync(reading, ct);
             else
                 logger.LogWarning(
                     "Yangın verisi parse edilemedi. Payload: {Payload}",

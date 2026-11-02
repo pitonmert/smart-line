@@ -15,7 +15,8 @@ namespace SmartLine.API.Migrations
                 table: "DatasetSessions",
                 column: "Status",
                 unique: true,
-                filter: "\"Status\" = 'ACTIVE'");
+                filter: "\"Status\" = 'ACTIVE'"
+            );
         }
 
         /// <inheritdoc />
@@ -23,7 +24,8 @@ namespace SmartLine.API.Migrations
         {
             migrationBuilder.DropIndex(
                 name: "IX_DatasetSessions_OneActive",
-                table: "DatasetSessions");
+                table: "DatasetSessions"
+            );
         }
     }
 }

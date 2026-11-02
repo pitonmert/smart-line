@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using SmartLine.API.Shared;
 using SmartLine.API.Tests.Infrastructure;
 
@@ -24,7 +24,12 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
 
         var response = await client.PostAsJsonAsync(
             "/api/products",
-            new { barcode = "INVALID-COLOR-1", color = "PURPLE", status = "OK" }
+            new
+            {
+                barcode = "INVALID-COLOR-1",
+                color = "PURPLE",
+                status = "OK",
+            }
         );
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, "PRODUCT_COLOR_INVALID");
@@ -37,7 +42,12 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
 
         var response = await client.PostAsJsonAsync(
             "/api/products",
-            new { barcode = "INVALID-STATUS-1", color = "RED", status = "BROKEN" }
+            new
+            {
+                barcode = "INVALID-STATUS-1",
+                color = "RED",
+                status = "BROKEN",
+            }
         );
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, "PRODUCT_STATUS_INVALID");
@@ -50,21 +60,27 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
         await AssertSuccessAsync(
             await client.PostAsJsonAsync(
                 "/api/products",
-                new { barcode = "PADDED-BARCODE-1", color = "RED", status = "OK" }
+                new
+                {
+                    barcode = "PADDED-BARCODE-1",
+                    color = "RED",
+                    status = "OK",
+                }
             ),
             HttpStatusCode.Created
         );
 
         var response = await client.PostAsJsonAsync(
             "/api/products",
-            new { barcode = "  PADDED-BARCODE-1  ", color = "RED", status = "OK" }
+            new
+            {
+                barcode = "  PADDED-BARCODE-1  ",
+                color = "RED",
+                status = "OK",
+            }
         );
 
-        await AssertErrorAsync(
-            response,
-            HttpStatusCode.Conflict,
-            "PRODUCT_BARCODE_DUPLICATE"
-        );
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "PRODUCT_BARCODE_DUPLICATE");
     }
 
     [Fact]
@@ -95,16 +111,9 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
         using var client = Fixture.CreateClient();
         await AssertSuccessAsync(await client.PostAsync("/api/conveyor/start", null));
 
-        var response = await client.PostAsJsonAsync(
-            "/api/conveyor/speed",
-            new { speed = 60 }
-        );
+        var response = await client.PostAsJsonAsync("/api/conveyor/speed", new { speed = 60 });
 
-        await AssertErrorAsync(
-            response,
-            HttpStatusCode.Conflict,
-            "CONVEYOR_MUST_BE_STOPPED"
-        );
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "CONVEYOR_MUST_BE_STOPPED");
     }
 
     [Fact]
@@ -130,7 +139,12 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
 
         var response = await client.PostAsJsonAsync(
             "/api/products",
-            new { barcode = $"NUMERIC-{status}-{color}", color, status }
+            new
+            {
+                barcode = $"NUMERIC-{status}-{color}",
+                color,
+                status,
+            }
         );
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, expectedCode);
@@ -160,11 +174,7 @@ public sealed class ErrorContractTests(ApiFixture fixture) : ApiTestBase(fixture
             new { barcode = "NUMERIC-DEVICE-1", color = "1" }
         );
 
-        await AssertErrorAsync(
-            response,
-            HttpStatusCode.BadRequest,
-            "PRODUCT_COLOR_INVALID"
-        );
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "PRODUCT_COLOR_INVALID");
     }
 
     [Fact]

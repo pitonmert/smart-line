@@ -7,8 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Contracts\recipes\demobox-legacy-320x240.json" LogicalName="SmartLine.API.Contracts.recipes.demobox-legacy-320x240.json" />
-    <EmbeddedResource Include="Contracts\calibration\uncalibrated.json" LogicalName="SmartLine.API.Contracts.calibration.uncalibrated.json" />
+    <EmbeddedResource
+      Include="Contracts\recipes\demobox-legacy-320x240.json"
+      LogicalName="SmartLine.API.Contracts.recipes.demobox-legacy-320x240.json"
+    />
+    <EmbeddedResource
+      Include="Contracts\calibration\uncalibrated.json"
+      LogicalName="SmartLine.API.Contracts.calibration.uncalibrated.json"
+    />
     <EmbeddedResource Include="Contracts\recipes\demobox.json">
       <LogicalName>SmartLine.API.Contracts.recipes.demobox.json</LogicalName>
     </EmbeddedResource>

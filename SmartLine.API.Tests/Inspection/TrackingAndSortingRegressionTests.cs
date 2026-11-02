@@ -12,7 +12,9 @@ public class TrackingAndSortingRegressionTests
     [InlineData(double.NegativeInfinity)]
     public void NonFiniteDistanceIsRejected(double distance)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => SortingTiming.DelayMilliseconds(distance, 200));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SortingTiming.DelayMilliseconds(distance, 200)
+        );
     }
 
     [Theory]
@@ -29,7 +31,9 @@ public class TrackingAndSortingRegressionTests
     [Fact]
     public void OverflowingDelayIsRejected()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => SortingTiming.DelayMilliseconds(1000, double.Epsilon));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SortingTiming.DelayMilliseconds(1000, double.Epsilon)
+        );
     }
 
     [Theory]
@@ -50,7 +54,9 @@ public class TrackingAndSortingRegressionTests
         Assert.Null(SortingTiming.SortDueAt(Start, null));
         Assert.Equal(Start, SortingTiming.SortDueAt(Start, 0));
         Assert.Equal(Start.AddSeconds(5), SortingTiming.SortDueAt(Start, 5000));
-        Assert.Throws<ArgumentOutOfRangeException>(() => SortingTiming.SortDueAt(DateTime.MaxValue, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SortingTiming.SortDueAt(DateTime.MaxValue, 1)
+        );
     }
 
     [Fact]
@@ -65,7 +71,9 @@ public class TrackingAndSortingRegressionTests
     [InlineData(0, -1)]
     public void NegativeProductionCountsAreRejected(int passCount, int rejectCount)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ProductionMath.YieldPercent(passCount, rejectCount));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ProductionMath.YieldPercent(passCount, rejectCount)
+        );
     }
 
     [Fact]
@@ -73,7 +81,8 @@ public class TrackingAndSortingRegressionTests
     {
         var state = ProductTracker.Create(Guid.NewGuid(), false, Start);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            ProductTracker.Advance(state, InspectionVocabulary.StageCaptured, Start.AddSeconds(-1)));
+            ProductTracker.Advance(state, InspectionVocabulary.StageCaptured, Start.AddSeconds(-1))
+        );
         Assert.Equal(InspectionVocabulary.StageDetected, state.Stage);
         Assert.Null(state.CapturedAt);
     }
@@ -85,14 +94,25 @@ public class TrackingAndSortingRegressionTests
         ProductTracker.Advance(state, InspectionVocabulary.StageCaptured, Start);
         ProductTracker.Advance(state, InspectionVocabulary.StageInspecting, Start);
         ProductTracker.Advance(state, InspectionVocabulary.StageDecided, Start.AddSeconds(1));
-        ProductTracker.Advance(state, InspectionVocabulary.StageManualReview, Start.AddSeconds(2), "operator review");
+        ProductTracker.Advance(
+            state,
+            InspectionVocabulary.StageManualReview,
+            Start.AddSeconds(2),
+            "operator review"
+        );
         ProductTracker.Advance(state, InspectionVocabulary.StageDecided, Start.AddSeconds(3));
         Assert.Equal(Start.AddSeconds(3), state.DecidedAt);
         Assert.Null(state.FailureReason);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            ProductTracker.Advance(state, InspectionVocabulary.StageQueued, Start.AddSeconds(2.5)));
+            ProductTracker.Advance(state, InspectionVocabulary.StageQueued, Start.AddSeconds(2.5))
+        );
 
-        ProductTracker.Advance(state, InspectionVocabulary.StageManualReview, Start.AddSeconds(4), "second review");
+        ProductTracker.Advance(
+            state,
+            InspectionVocabulary.StageManualReview,
+            Start.AddSeconds(4),
+            "second review"
+        );
         Assert.Equal(Start.AddSeconds(4), state.ManualReviewAt);
     }
 

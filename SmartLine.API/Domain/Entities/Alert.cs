@@ -33,5 +33,4 @@ public class Alert
     /// Alarm kaydının son güncellendiği UTC zaman.
     /// </summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
 }

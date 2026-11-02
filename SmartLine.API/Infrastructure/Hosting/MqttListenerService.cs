@@ -87,6 +87,5 @@ public sealed class MqttListenerService(
                 logger.LogWarning(exception, "MQTT shutdown failed.");
             }
         }
-
     }
 }

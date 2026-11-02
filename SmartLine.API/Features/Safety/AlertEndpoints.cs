@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using SmartLine.API.Domain.Enums;
 using SmartLine.API.Domain.Entities;
+using SmartLine.API.Domain.Enums;
 using SmartLine.API.Features.Monitoring;
 using SmartLine.API.Infrastructure.Persistence;
 using SmartLine.API.Infrastructure.Realtime;
@@ -13,8 +13,7 @@ public static class AlertEndpoints
 {
     public static RouteGroupBuilder MapAlertEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app
-            .MapGroup("/api/alerts");
+        var group = app.MapGroup("/api/alerts");
         group.MapGet(
             "",
             async (int? pageNumber, int? pageSize, AlertHandler handler, CancellationToken ct) =>
@@ -38,12 +37,7 @@ public static class AlertEndpoints
         );
         group.MapGet(
             "/active",
-            async (
-                int? pageNumber,
-                int? pageSize,
-                AlertHandler handler,
-                CancellationToken ct
-            ) =>
+            async (int? pageNumber, int? pageSize, AlertHandler handler, CancellationToken ct) =>
                 Results.Ok(
                     ApiResponse<PagedResult<AlertResponse>>.Success(
                         await handler.ActiveAsync(pageNumber ?? 1, pageSize ?? 20, ct)
@@ -62,12 +56,7 @@ public static class AlertEndpoints
                 EnumParser.TryParseDefined<AlertType>(type, out var parsed)
                     ? Results.Ok(
                         ApiResponse<PagedResult<AlertResponse>>.Success(
-                            await handler.ByTypeAsync(
-                                parsed,
-                                pageNumber ?? 1,
-                                pageSize ?? 20,
-                                ct
-                            )
+                            await handler.ByTypeAsync(parsed, pageNumber ?? 1, pageSize ?? 20, ct)
                         )
                     )
                     : Results.BadRequest(
@@ -77,17 +66,16 @@ public static class AlertEndpoints
                         )
                     )
         );
-        group
-            .MapPost(
-                "/{id:int}/resolve",
-                async (int id, AlertHandler handler, CancellationToken ct) =>
-                    Results.Ok(
-                        ApiResponse<AlertResponse>.Success(
-                            await handler.ResolveAsync(id, ct),
-                            $"Alarm #{id} çözüldü"
-                        )
+        group.MapPost(
+            "/{id:int}/resolve",
+            async (int id, AlertHandler handler, CancellationToken ct) =>
+                Results.Ok(
+                    ApiResponse<AlertResponse>.Success(
+                        await handler.ResolveAsync(id, ct),
+                        $"Alarm #{id} çözüldü"
                     )
-            );
+                )
+        );
         return group;
     }
 }
@@ -144,10 +132,7 @@ public sealed class AlertHandler(
             ct
         );
 
-    public async Task<Alert> StageCreateAsync(
-        AlertType type,
-        CancellationToken ct = default
-    )
+    public async Task<Alert> StageCreateAsync(AlertType type, CancellationToken ct = default)
     {
         var alert = new Alert
         {
@@ -185,7 +170,8 @@ public sealed class AlertHandler(
             await db.SaveChangesAsync(ct);
         }
 
-        var alert = await db.Alerts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, ct)
+        var alert =
+            await db.Alerts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, ct)
             ?? throw new NotFoundException("Alert", id);
         await transaction.CommitAsync(ct);
 

@@ -40,8 +40,7 @@ public sealed class NotFoundException : ApiException
             StatusCodes.Status404NotFound,
             ErrorCodes.ResourceNotFound,
             $"{entityName} bulunamadı. Id: {key}"
-        )
-    { }
+        ) { }
 }
 
 public sealed class ValidationException : ApiException

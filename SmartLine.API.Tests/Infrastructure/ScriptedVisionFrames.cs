@@ -41,6 +41,17 @@ public sealed class ScriptedVisionFrames : IVisionFrames
             );
         }
 
-        return Task.FromResult(new VisionCapturedFrame(Jpeg, DateTime.UtcNow, 640, 480, role, "still_capture", "esp32_capture", false));
+        return Task.FromResult(
+            new VisionCapturedFrame(
+                Jpeg,
+                DateTime.UtcNow,
+                640,
+                480,
+                role,
+                "still_capture",
+                "esp32_capture",
+                false
+            )
+        );
     }
 }

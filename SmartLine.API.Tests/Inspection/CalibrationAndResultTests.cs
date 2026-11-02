@@ -5,7 +5,8 @@ namespace SmartLine.API.Tests.Inspection;
 public class CalibrationAndResultTests
 {
     [Fact]
-    public void UncalibratedProfileIsSafe() => Assert.Empty(CalibrationValidator.Validate(ContractCatalog.Uncalibrated()));
+    public void UncalibratedProfileIsSafe() =>
+        Assert.Empty(CalibrationValidator.Validate(ContractCatalog.Uncalibrated()));
 
     [Theory]
     [InlineData(double.NaN)]
@@ -38,7 +39,10 @@ public class CalibrationAndResultTests
         var calibration = ContractCatalog.Uncalibrated();
         calibration.HardwareActuationEnabled = true;
         calibration.HardwareActuationConfirmed = true;
-        Assert.Contains(CalibrationValidator.Validate(calibration), e => e.Contains("not integrated"));
+        Assert.Contains(
+            CalibrationValidator.Validate(calibration),
+            e => e.Contains("not integrated")
+        );
     }
 
     [Theory]
@@ -47,13 +51,35 @@ public class CalibrationAndResultTests
     public void ResultDoesNotInventModelMetadata(string source, bool hasModel)
     {
         var recipe = ContractCatalog.DemoBox();
-        var observation = new InspectionObservation { ObservationSource = source, Confidence = .9, ProductClass = "BOX_RED", ModelName = "actual", ModelVersion = "1" };
+        var observation = new InspectionObservation
+        {
+            ObservationSource = source,
+            Confidence = .9,
+            ProductClass = "BOX_RED",
+            ModelName = "actual",
+            ModelVersion = "1",
+        };
         var decision = DecisionEngine.Decide(recipe, observation);
         var now = DateTime.UtcNow;
-        var result = InspectionResultFactory.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), recipe, observation, decision, now, now, 12);
+        var result = InspectionResultFactory.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            recipe,
+            observation,
+            decision,
+            now,
+            now,
+            12
+        );
         Assert.Equal(hasModel ? "actual" : null, result.ModelName);
         Assert.Equal(hasModel ? 12 : (int?)null, result.ProcessingLatencyMs);
         Assert.Equal(source, result.ObservationSource);
-        Assert.Equal(result.ObservationSource, InspectionJson.Deserialize<InspectionResult>(InspectionJson.Serialize(result)).ObservationSource);
+        Assert.Equal(
+            result.ObservationSource,
+            InspectionJson
+                .Deserialize<InspectionResult>(InspectionJson.Serialize(result))
+                .ObservationSource
+        );
     }
 }

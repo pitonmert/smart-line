@@ -35,7 +35,12 @@ public class TrackingAndSortingTests
             ProductTracker.Advance(state, InspectionVocabulary.StageSorted, Start)
         );
 
-        ProductTracker.Advance(state, InspectionVocabulary.StageFailed, Start.AddSeconds(1), "camera offline");
+        ProductTracker.Advance(
+            state,
+            InspectionVocabulary.StageFailed,
+            Start.AddSeconds(1),
+            "camera offline"
+        );
         Assert.Equal("camera offline", state.FailureReason);
         Assert.Throws<InvalidTrackingTransitionException>(() =>
             ProductTracker.Advance(state, InspectionVocabulary.StageDetected, Start.AddSeconds(2))
@@ -48,7 +53,12 @@ public class TrackingAndSortingTests
         var state = ProductTracker.Create(Guid.NewGuid(), true, Start);
         ProductTracker.Advance(state, InspectionVocabulary.StageCaptured, Start);
         ProductTracker.Advance(state, InspectionVocabulary.StageInspecting, Start);
-        ProductTracker.Advance(state, InspectionVocabulary.StageManualReview, Start.AddSeconds(1), "operator");
+        ProductTracker.Advance(
+            state,
+            InspectionVocabulary.StageManualReview,
+            Start.AddSeconds(1),
+            "operator"
+        );
         ProductTracker.Advance(state, InspectionVocabulary.StageDecided, Start.AddSeconds(2));
         Assert.Equal(InspectionVocabulary.StageDecided, state.Stage);
         Assert.NotNull(state.ManualReviewAt);
@@ -102,9 +112,12 @@ public class TrackingAndSortingTests
     [InlineData(3, 1, 75.0)]
     [InlineData(0, 2, 0.0)]
     [InlineData(1, 2, 33.3)]
-    public void YieldIgnoresAnEmptyDecidedPopulation(int passCount, int rejectCount, double? expected)
+    public void YieldIgnoresAnEmptyDecidedPopulation(
+        int passCount,
+        int rejectCount,
+        double? expected
+    )
     {
         Assert.Equal(expected, ProductionMath.YieldPercent(passCount, rejectCount));
     }
-
 }

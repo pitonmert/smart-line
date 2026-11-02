@@ -56,7 +56,9 @@ public static class ContractSeeder
             );
         }
 
-        var demos = await db.ProductRecipes.Where(recipe => recipe.Name == DemoBoxName).ToListAsync(ct);
+        var demos = await db
+            .ProductRecipes.Where(recipe => recipe.Name == DemoBoxName)
+            .ToListAsync(ct);
         foreach (var recipe in demos)
             LegacyRecipeCorrection.TryCorrect(recipe);
 

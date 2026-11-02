@@ -1,5 +1,5 @@
-using SmartLine.API.Tests.Infrastructure;
 using SmartLine.API.Domain.Enums;
+using SmartLine.API.Tests.Infrastructure;
 
 namespace SmartLine.API.Tests.Production;
 
@@ -15,22 +15,18 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
         var duplicate = await client.PostAsJsonAsync("/api/sensors/barcode", payload);
 
         await AssertSuccessAsync(first);
-        await AssertErrorAsync(
-            duplicate,
-            HttpStatusCode.Conflict,
-            "PRODUCT_BARCODE_DUPLICATE"
-        );
+        await AssertErrorAsync(duplicate, HttpStatusCode.Conflict, "PRODUCT_BARCODE_DUPLICATE");
 
         var state = await Fixture.WithDbContextAsync(async db => new
         {
             ProductCount = await db.Products.CountAsync(product =>
                 product.Barcode == "DUPLICATE-001"
             ),
-            DailyTotal = await db.Statistics
-                .Where(statistic => statistic.Hour == null)
+            DailyTotal = await db
+                .Statistics.Where(statistic => statistic.Hour == null)
                 .SumAsync(statistic => statistic.TotalProducts),
-            HourlyTotal = await db.Statistics
-                .Where(statistic => statistic.Hour != null)
+            HourlyTotal = await db
+                .Statistics.Where(statistic => statistic.Hour != null)
                 .SumAsync(statistic => statistic.TotalProducts),
         });
         Assert.Equal(1, state.ProductCount);
@@ -47,10 +43,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
         var requests = Enumerable
             .Range(0, 8)
             .Select(_ =>
-                client.PostAsJsonAsync(
-                    "/api/sensors/barcode",
-                    new { barcode, color = "BLUE" }
-                )
+                client.PostAsJsonAsync("/api/sensors/barcode", new { barcode, color = "BLUE" })
             );
         var responses = await Task.WhenAll(requests);
 
@@ -59,9 +52,11 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
             7,
             responses.Count(response => response.StatusCode == HttpStatusCode.Conflict)
         );
-        foreach (var conflict in responses.Where(response =>
-                     response.StatusCode == HttpStatusCode.Conflict
-                 ))
+        foreach (
+            var conflict in responses.Where(response =>
+                response.StatusCode == HttpStatusCode.Conflict
+            )
+        )
         {
             var json = await ReadJsonAsync(conflict);
             Assert.Equal("PRODUCT_BARCODE_DUPLICATE", StringProperty(json, "code"));
@@ -71,8 +66,7 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
             db.Products.CountAsync(product => product.Barcode == barcode)
         );
         var dailyTotal = await Fixture.WithDbContextAsync(db =>
-            db.Statistics
-                .Where(statistic => statistic.Hour == null)
+            db.Statistics.Where(statistic => statistic.Hour == null)
                 .SumAsync(statistic => statistic.TotalProducts)
         );
         Assert.Equal(1, productCount);
@@ -111,8 +105,8 @@ public sealed class BarcodeTests(ApiFixture fixture) : ApiTestBase(fixture)
             Alerts = await db.Alerts.CountAsync(alert =>
                 alert.AlertType == AlertType.NO_BARCODE_DETECTED && alert.IsActive
             ),
-            DailyTotal = await db.Statistics
-                .Where(statistic => statistic.Hour == null)
+            DailyTotal = await db
+                .Statistics.Where(statistic => statistic.Hour == null)
                 .SumAsync(statistic => statistic.TotalProducts),
         });
         Assert.Equal(1, state.Products);

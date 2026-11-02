@@ -16,13 +16,17 @@ public static class ApplicationInitialization
             await ContractSeeder.EnsureAsync(db);
             try
             {
-                await scope.ServiceProvider.GetRequiredService<DatasetStore>()
+                await scope
+                    .ServiceProvider.GetRequiredService<DatasetStore>()
                     .RecoverAsync(CancellationToken.None);
             }
             catch (ApiException error) when (error.StatusCode == 503)
             {
                 // Dataset depolaması kapalı olsa da diğer API işlevleri açılabilir.
-                app.Logger.LogError(error, "Dataset recovery is unavailable; other API services remain enabled.");
+                app.Logger.LogError(
+                    error,
+                    "Dataset recovery is unavailable; other API services remain enabled."
+                );
             }
         }
     }

@@ -28,9 +28,7 @@ public sealed class MqttService : IMqttService, IAsyncDisposable
         _options = options.Value;
         _logger = logger;
         _client = new MqttClientFactory().CreateMqttClient();
-        _caCertificate = X509CertificateLoader.LoadCertificateFromFile(
-            _options.CaCertificatePath
-        );
+        _caCertificate = X509CertificateLoader.LoadCertificateFromFile(_options.CaCertificatePath);
         _clientCertificate = X509Certificate2.CreateFromPemFile(
             _options.ClientCertificatePath,
             _options.ClientKeyPath
