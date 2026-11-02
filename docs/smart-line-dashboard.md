@@ -1,138 +1,76 @@
-# SmartLine.Dashboard teknik referansı
+# SmartLine.Dashboard
 
-SmartLine.Dashboard, React 19, TypeScript, Vite ve Tailwind tabanlı aynı-origin kontrol merkezidir. Sayfalar history API ile değişir: Control Room, AI Inspection, Production Analytics, Sensors, Sorting, Product Recipes, Calibration, Dataset & AI, Inspection History, System Diagnostics.
+The Dashboard uses React, TypeScript, Vite and Tailwind. It is an operator monitoring interface with separate maintenance and manual tools. API decisions and backend contracts are unchanged by the UI layout.
 
-Kamera paneli MJPEG görüntüsünü `object-fit: contain` ile doldurur. Çözünürlük artırılmaz. Bounding box koordinatları kaynak pikseldedir. Canvas, görüntünün letterbox ölçeği ve boşluk payıyla aynı dönüşümü kullanır. Overlay son inspection'a aittir; her akan kareye kilitli değildir. SIMULATION sonuçları rozetle gösterilir. Acil durdurma mevcut onaylı kontrol olarak kalır. Gerçek servo komutu bu arayüzden gönderilmez.
+## Navigation and responsibilities
 
-## Kaynak yapısı
+| Main area | Contents |
+| --- | --- |
+| Production (`/`) | Camera preview, last stored evaluation, real inspection counters, environment status and active problems. No conveyor commands or inspection triggers. |
+| History (`/history`) | Search, decision/class/source filters, pagination and expandable inspection metadata. Optional summary keeps barcode counts separate from inspection counts. |
+| Management (`/management`) | Task groups for line control, settings/maintenance and technical tools. Only the selected task is mounted. |
 
-```text
-SmartLine.Dashboard/src/
-├── api/client.ts
-├── components/
-│   ├── conveyor/
-│   ├── gauges/
-│   ├── charts/
-│   ├── alerts/
-│   ├── activity/
-│   ├── layout/
-│   └── simulator/
-├── context/DashboardContext.tsx
-├── hooks/
-│   ├── useDashboard.ts
-│   ├── useSignalR.ts
-│   └── useAlertSound.ts
-├── types/index.ts
-├── App.tsx
-└── main.tsx
-```
+Management routes: `/management/control`, `/management/recipes`, `/management/calibration`, `/management/sensors`, `/management/diagnostics`, `/management/inspection`, `/management/sorting`, `/management/dataset` and `/management/simulation`.
 
-## Direct access
+Previous `/inspection`, `/recipes`, `/calibration`, `/sensors`, `/diagnostics`, `/sorting` and `/dataset` URLs are replaced with their management equivalents. `/analytics` redirects to `/history`. Browser back/forward and direct loading remain supported; unrecognized addresses show a return link.
 
-The control center opens immediately without login or session restoration. There are no users, roles, token refresh requests or logout controls. All actions are visible; operation-specific conditions still apply. Emergency reset remains disabled while a fire or generation fault is active, and it does not automatically restart the conveyor.
+## Production monitoring
 
-## API client ve hata davranışı
+The camera and last evaluation have equal visual weight on wide screens and stack on small screens. At 1920×1080, the normal overview fits without scrolling; expanded details and unusual amounts of alert content may require scrolling.
 
-Tüm istekler relative `/api` yolunu kullanır. Success/failure envelope tipi:
+The camera polls the existing API preview endpoint. It is not a continuous inference trigger. The ROI is mapped using the existing source geometry and letterbox calculations. Stored inspection boxes are not drawn over a later preview. Camera failure is marked even if the previous frame remains visible.
 
-```ts
-interface ApiResponse<T> {
-  isSuccess: boolean;
-  message: string;
-  data: T;
-  code?: string;
-}
-```
+The result shows class, decision, confidence, destination and processing time; expandable metadata includes color, size, defects, reasons, model, recipe version, source and dimensions. Simulation remains explicitly labeled. Missing values are unknown, not zero or healthy.
 
-`ApiError`, HTTP status yanında kararlı API `code` değerini taşır. Kullanıcı mesajları `REQUEST_INVALID`, `ACCESS_DENIED`, `CONVEYOR_EMERGENCY_LATCHED`, `FIRE_SENSOR_ACTIVE`, `MQTT_UNAVAILABLE` gibi kodlardan seçilir; UI mantığı Türkçe backend mesajına bağlanmaz.
+Inspection counters exclude simulation. Yield is `pass / (pass + reject)`; manual review is outside that denominator. No decided population is displayed as a dash. Destination counts represent logical destinations, not confirmed physical arrivals.
 
-Dashboard'un kullandığı ana REST çağrıları:
+## Data and failures
 
-- `POST /api/auth/login`, `/refresh`, `/logout`; `GET /api/auth/me`
-- `GET /api/dashboard`, `/api/statistics/hourly`
-- `POST /api/conveyor/speed`, `/start`, `/stop`, `/emergency-stop`, `/emergency-reset`
-- `POST /api/alerts/{id}/resolve`
-- Development simulator için sensor POST endpoint'leri
+`PlantContext` shares control-room, diagnostics and recipe queries across the header and screens. Inspection/tracking SignalR events refresh monitoring data. Tool-specific polling starts only when the task mounts and stops on unmount. History analytics mounts only while its summary is open.
 
-`ConveyorStatusDto`, `isEmergencyStopped`, `isFireDetected`, `fireDeviceEpoch`, `lastFireGeneration` ve `isFireGenerationFault` alanlarını içerir. UI herhangi bir safety interlock aktifken start ve speed kontrollerini kapatır; generation fault durumunda cihazın yeniden provision edilmesi gerektiğini gösterir ve manual reset'i de devre dışı bırakır.
+`DashboardContext` holds conveyor, environment, product, alert and connection state. `useSignalR` connects to `/hubs/dashboard` without credentials, using reconnect delays of 0, 2, 5 and 10 seconds. On reconnection, `/api/dashboard` refreshes missed state.
 
-## Realtime akışı
+Failed polls retain the last known response with an error indicator. Conveyor commands require a connected hub, recent monitoring responses, an online ESP32 and connected MQTT. Existing emergency/fire/generation interlocks remain enforced. Resetting a latch does not start the conveyor. Write errors preserve form input and show feedback; successful requests use the returned server state.
 
-`useSignalR`, `/hubs/dashboard` bağlantısını without an access token açar ve otomatik reconnect aralıklarını `0`, `2`, `5`, `10` saniye olarak ayarlar.
+Global fire reporting and alert sound remain available in every section. Alarm acknowledgment is performed in Management. No user accounts, roles, token restoration or HTTP device/service keys are used.
 
-| SignalR event              | State etkisi                    |
-| -------------------------- | ------------------------------- |
-| `ReceiveConveyorUpdate`    | Conveyor state'i değiştirir     |
-| `ReceiveEnvironmentUpdate` | Sıcaklık, nem ve fanı günceller |
-| `ReceiveProductUpdate`     | Son ürünlere ekler              |
-| `ReceiveAlertUpdate`       | Aktif alarm state'ini günceller |
-| `ReceiveLogUpdate`         | Canlı log akışına ekler         |
+## Management and tools
 
-Bağlantı yeniden kurulduğunda `GET /api/dashboard` ile snapshot tekrar alınır; bu, kaçırılmış realtime event'lerden sonra state'i düzeltir. Hub istemcilere broadcast yapan public `Send*` metotları sunmaz.
+- Line control provides speed, start/normal stop, emergency stop, reset and alert acknowledgment.
+- Settings/maintenance provides recipes, calibration profiles, sensor readings and full diagnostics. Unintegrated measurements are not presented as real hardware data.
+- Tools provides explicit camera inspection and manual observations, logical sorting, dataset collection and simulation.
 
-## Ekran bileşenleri
+Logical release records SORTED without sending a servo command. Camera dataset collection preserves sessions, labels, image browsing, discard and manual/interval captures; disk uploads are absent. Dataset intervals stop on page unmount and pause on visibility loss, offline state or request failures. Sensor simulators are development-only; inspection simulation additionally follows the API's simulation flag. No hidden simulator is kept running by the global layout.
 
-- `ConveyorCard`: hız, running, emergency/fire state ve operational controls.
-- `EmergencyStop`: normal stop ile emergency-stop'u ayrı çağırır; manual reset ayrıdır.
-- `EnvironmentPanel`: sıcaklık/nem/fan görünümü.
-- `ProductionAndProducts`: canlı/saatlik üretim ve son ürünler.
-- `AlertsPanel` ve `FireAlarmOverlay`: aktif alarm görünümü ve alarm resolution.
-- `LiveLogFeed`: SignalR log akışı.
-- `Header`: SignalR/device connection state and clock.
+## Language, theme and accessibility
 
-## Development simulator paneli
+TR/EN and dark/light selections apply without reloading or resetting forms. Defaults are English and dark. Browser storage keys are `smartline.language` and `smartline.theme`; corrupt or unavailable storage falls back safely. Locale formatting and document language/title follow the language. API wire values, recipe names, user notes and unknown server text are preserved.
 
-Browser tabanlı sensor simulator yalnız şu iki koşulda render edilir:
+Theme colors use shared CSS tokens, including gauges. Visible keyboard focus, semantic links, expanded-state controls and textual status labels support operation without relying on color. The header offers application full screen, independently of camera-only full screen. Responsive layouts support desktop monitoring and smaller maintenance screens.
 
-```text
-import.meta.env.DEV
-```
+## Development and mock preview
 
-Production bundle'da panel görünmez. Sensor HTTP requests do not require credentials. Fire simulator, 32 karakterlik rastgele development `deviceEpoch` ve monoton `fireGeneration` değerini browser `localStorage` içinde korur; rising-edge yeni generation üretir, clear aynı generation'ı gönderir.
-
-Lokal çalıştırma:
-
-```bash
+```sh
 cd SmartLine.Dashboard
 npm ci
-API_TARGET=http://localhost:5047 \
 npm run dev
+# Hardware-free, read-only fixtures instead:
+npm run dev:mock
 ```
 
-Dashboard tarayıcıdan `http://localhost:5173` açılır; `/api` ve `/hubs` Vite proxy üzerinden API'ye gider. CORS kullanılmaz.
+Vite forwards API and hub traffic using `API_TARGET` (default `http://localhost:5047`). Mock mode replaces that forwarding with local fixtures, a SignalR mock and an illustrated frame; writes return `409 MOCK_READ_ONLY`. Normal development and production do not enable the mock server.
 
-## Build ve production
+## Verification and deployment
 
-```bash
-cd SmartLine.Dashboard
+```sh
 npm run lint
+npm test
 npm run build
 npm run e2e
 ```
 
-`npm run e2e` Playwright ile production preview üzerinde direct startup, on ana sayfa, kamera paneli, simülasyon bandı ve dataset yakalama düğmesini route mock'larıyla doğrular. No authentication requests or bearer headers are sent. Trace ve ekran görüntüleri üretilen dosyalardır.
+Playwright tests run against a production preview with mocked services. Test/build success does not establish live hardware or production availability.
 
-The production Dashboard is built by the Node stage in `SmartLine.API/Dockerfile` and copied into the API image's `wwwroot`. ASP.NET Core serves it directly at `https://smartline.local`, alongside `/api`, `/hubs` and `/health`. Browser navigation routes return `index.html`; unknown API/hub routes and missing assets remain 404. Vite remains the development server with its local API/WebSocket forwarding.
+The Node stage of `SmartLine.API/Dockerfile` builds the Dashboard and copies `dist` into the API's `wwwroot`. ASP.NET Core serves the application at the configured HTTPS origin. Browser routes return `index.html`; unknown API/hub routes and missing assets remain 404. See [deployment.md](deployment.md) for LAN certificates and deployment.
 
-To serve the built Dashboard from a local API checkout instead of Vite, run from the repository root:
-
-```sh
-npm --prefix SmartLine.Dashboard run build
-mkdir -p SmartLine.API/wwwroot
-cp -R SmartLine.Dashboard/dist/. SmartLine.API/wwwroot/
-```
-
-The generated `wwwroot` directory is ignored by Git. Start the API with its usual local database and MQTT settings, then open its configured URL. Docker production builds perform the Dashboard build and copy automatically. Do not put secrets or dataset files in `wwwroot`: everything there is public.
-
-Production kurulumu ve yerel CA trust adımları için [deployment.md](deployment.md) kullanılır.
-
-## Dataset toplama
-
-Dataset & AI sayfası canlı MJPEG önizlemeyi gösterir ve `Capture from camera` ile sunucudan bir JPEG ister. Tarayıcı, cross-origin MJPEG öğesinin piksellerini okumaz. API, Vision `GET /frames/dataset` karesini tek dosya olarak dataset oturumuna yazar. Ürün sınıfı, renk, boyut ve kusur seçenekleri aktif Product Recipe listelerinden gelir. Kalite `GOOD` veya `DEFECTIVE` olur. Aralık yakalama aynı kamera uç noktasını, ekrandaki güncel etiketlerle çağırır. Thumbnails are fetched directly and displayed as blob URLs. Ham görüntüler Git'e girmez.
-
-Dataset collection uses camera capture only, manually or at the configured interval. There is no file picker or disk import action. Existing image viewing, session controls, and sample discard remain available.
-
-## Sınırlar
-
-- UI'nın connected göstergesi safety kanıtı değildir. Fiziksel safety relay/hardwired E-stop ayrı zorunluluktur.
-- Production tek API instance varsayar; SignalR backplane yoktur.
+For a local API checkout, build the Dashboard and copy `SmartLine.Dashboard/dist/.` into the ignored `SmartLine.API/wwwroot/` directory. Do not place secrets or dataset files there.

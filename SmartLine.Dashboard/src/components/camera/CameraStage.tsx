@@ -1,3 +1,4 @@
+import { useLanguage } from '../../i18n/LanguageContext'
 import { api } from '../../api/client'
 import { useEffect, useRef, useState } from 'react'
 import { mapSourceBox, normalizedRoiToSource, type SourceBox } from '../../lib/overlay'
@@ -8,10 +9,8 @@ export interface OverlayItem extends SourceBox {
 }
 
 interface Props {
-  streamUrl: string
   sourceWidth: number
   sourceHeight: number
-  items: OverlayItem[]
   roi?: { x: number; y: number; width: number; height: number } | null
   title?: string
   simulation?: boolean
@@ -19,13 +18,9 @@ interface Props {
 
 const stroke = { pass: '#4ade80', reject: '#f87171', review: '#fbbf24', roi: '#60a5fa' }
 
-/**
- * The stream image is drawn by the browser. The canvas is a separate overlay.
- * Synchronization is by inspection geometry, not by grabbing pixels out of the
- * MJPEG element: boxes stay in source pixels and are mapped through the same
- * object-fit contain rectangle the image uses.
- */
+// The preview is independent of stored inspections; only the configured ROI is drawn.
 export default function CameraStage({ sourceWidth, sourceHeight, roi, title, simulation }: Props) {
+  const { t, text } = useLanguage()
   const frameRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -73,7 +68,7 @@ export default function CameraStage({ sourceWidth, sourceHeight, roi, title, sim
     if (!context) return
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, size.width, size.height)
-    // Eski inceleme kutuları farklı zamandaki canlı görüntünün üzerine çizilmez.
+    // Never draw stored inspection boxes over a newer preview frame.
     const drawable: OverlayItem[] = []
     if (roi) drawable.push({ ...normalizedRoiToSource(roi, sourceWidth, sourceHeight), label: 'ROI', tone: 'roi' })
     for (const item of drawable) {
@@ -102,22 +97,24 @@ export default function CameraStage({ sourceWidth, sourceHeight, roi, title, sim
       <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-slate-200">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${camera === 'online' ? 'bg-success-light' : camera === 'offline' ? 'bg-danger-light' : 'bg-warning-light'}`} />
-          <span>Camera {camera}</span>
-          <span className="text-slate-400">{sourceWidth}×{sourceHeight} source</span>
-          {simulation && <span className="rounded bg-warning/20 px-1.5 py-0.5 font-semibold text-warning-light">SIMULATION</span>}
+          <span>{t("Camera")}{' '}{text(camera)}</span>
+          <span className="text-slate-400">{sourceWidth}×{sourceHeight}{' '}{t("source")}</span>
+          {simulation && <span className="rounded bg-warning/20 px-1.5 py-0.5 font-semibold text-warning-light">{t("SIMULATION")}</span>}
         </div>
-        <button type="button" onClick={fullscreen} className="rounded border border-white/20 px-2 py-1 hover:bg-white/10">Full screen</button>
+        <button type="button" onClick={fullscreen} className="rounded border border-white/20 px-2 py-1 hover:bg-white/10">{t("Full screen")}</button>
       </div>
       <div ref={frameRef} className="relative min-h-0 flex-1">
-        <img
+        {!preview && <p className="absolute inset-0 flex items-center justify-center text-sm text-slate-300">{t(camera === 'offline' ? 'No image available' : 'Waiting for data')}</p>}
+        {camera === 'offline' && preview && <div role="status" className="absolute inset-x-0 top-10 z-10 bg-black/80 px-3 py-2 text-center text-sm text-amber-200">{t('Camera disconnected · last frame')}</div>}
+        {preview && <img
           src={preview}
-          alt="Live conveyor camera"
+          alt={t("Live conveyor camera")}
           className="h-full w-full object-contain"
           onLoad={() => setCamera('online')}
           onError={() => setCamera('offline')}
-        />
+        />}
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0" />
-        <div className="pointer-events-none absolute top-2 left-3 rounded bg-black/70 px-2 text-xs text-white">Live preview · result boxes are not overlaid</div>
+        <div className="pointer-events-none absolute top-2 left-3 rounded bg-black/70 px-2 text-xs text-white">{t("Live preview · result boxes are not overlaid")}</div>
         {title && <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-black/70 px-2 py-1 text-xs text-white">{title}</div>}
       </div>
     </div>

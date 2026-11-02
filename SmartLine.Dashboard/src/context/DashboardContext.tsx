@@ -1,3 +1,4 @@
+import type { DisplayText } from '../i18n/language'
 // @refresh reset
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
 import type { ConveyorStatusDto, ProductDto, AlertDto, LogDto, StatisticsDto } from '../types'
@@ -12,7 +13,7 @@ export interface DashboardState {
   lastHeartbeat: Date | null
   chartMode: 'live' | 'historical'
   liveProductCounts: { time: string; ok: number; defective: number }[]
-  error: string | null
+  error: DisplayText | null
 }
 
 export type DashboardAction =
@@ -24,7 +25,7 @@ export type DashboardAction =
   | { type: 'ADD_LOG'; payload: LogDto }
   | { type: 'SET_CONNECTION'; payload: DashboardState['connection'] }
   | { type: 'SET_CHART_MODE'; payload: 'live' | 'historical' }
-  | { type: 'SET_ERROR'; payload: string }
+  | { type: 'SET_ERROR'; payload: DisplayText }
 
 const initialState: DashboardState = {
   connection: 'connecting',

@@ -1,131 +1,80 @@
-import { useEffect } from 'react'
-import { api } from '../api/client'
-import CameraStage, { type OverlayItem } from '../components/camera/CameraStage'
-import ConveyorCard from '../components/conveyor/ConveyorCard'
-import EnvironmentPanel from '../components/gauges/EnvironmentPanel'
-import SimulationPanel from '../components/inspection/SimulationPanel'
-import { decisionTone, formatTime, healthTone } from '../components/inspection/format'
-import { ErrorNote, Panel, SimulationBanner, StatusPill } from '../components/inspection/ui'
+import { useLanguage } from '../i18n/LanguageContext'
+import { useClock } from '../hooks/useClock'
+import { usePlant } from '../context/PlantContext'
 import { useDashboardState } from '../context/DashboardContext'
-import { usePolling } from '../hooks/usePolling'
-import type { InspectionResult } from '../types/inspection'
+import CameraStage from '../components/camera/CameraStage'
+import InspectionDetails from '../components/inspection/InspectionDetails'
+import ProductionCounters from '../components/inspection/ProductionCounters'
+import { SimulationBanner } from '../components/inspection/ui'
+import { decisionTone } from '../components/inspection/format'
+import type { MessageKey } from '../i18n/catalog'
+import type { AppPath } from '../navigation/routes'
 
-const LIVE_PREVIEW = { width: 240, height: 176 }
-
-function overlayItems(inspection: InspectionResult | null | undefined): OverlayItem[] {
-  if (!inspection) return []
-  const tone = inspection.decision === 'REJECT' ? 'reject' : inspection.decision === 'MANUAL_REVIEW' ? 'review' : 'pass'
-  return inspection.boundingBoxes.map(box => ({
-    x: box.x,
-    y: box.y,
-    width: box.width,
-    height: box.height,
-    tone,
-    label: `${inspection.simulation ? 'SIM ' : ''}${box.label || inspection.productClass} ${Math.round(inspection.confidence * 100)}% ${inspection.decision}`,
-  }))
-}
-
-export default function ControlRoom() {
+export default function ControlRoom({ navigate }: { navigate: (path: AppPath) => void }) {
+  const { t, text, date, number } = useLanguage()
+  const { room, diagnostics, recipes } = usePlant()
   const { conveyor, activeAlerts, connection } = useDashboardState()
-  const room = usePolling(() => api.getControlRoom(), 3000)
-  const diagnostics = usePolling(() => api.getDiagnostics(), 5000)
-  const recipes = usePolling(() => api.getRecipes(), 15000)
-  const reloadRoom = room.reload
-  const reloadDiagnostics = diagnostics.reload
-
-  useEffect(() => {
-    const refresh = () => {
-      reloadRoom()
-      reloadDiagnostics()
-    }
-    window.addEventListener('smartline-inspection', refresh)
-    window.addEventListener('smartline-tracking', refresh)
-    return () => {
-      window.removeEventListener('smartline-inspection', refresh)
-      window.removeEventListener('smartline-tracking', refresh)
-    }
-  }, [reloadDiagnostics, reloadRoom])
-
-  const activeRecipe = recipes.data?.find(item => item.isActive)
+  const now = useClock()
   const inspection = room.data?.lastInspection
-  const sourceWidth = inspection?.geometry?.sourceWidth || activeRecipe?.definition.cameraProfile.sourceWidth || LIVE_PREVIEW.width
-  const sourceHeight = inspection?.geometry?.sourceHeight || activeRecipe?.definition.cameraProfile.sourceHeight || LIVE_PREVIEW.height
-  const streamUrl = import.meta.env.VITE_CAMERA_STREAM_URL || diagnostics.data?.cameraStreamUrl || activeRecipe?.definition.cameraProfile.streamUrl || 'http://192.168.1.50:81/stream'
+  const recipe = recipes.data?.find(item => item.isActive)
   const report = diagnostics.data
-  return (
-    <div className="flex flex-col gap-4">
-      {room.data?.simulationActive && <SimulationBanner text="Simulator values are on screen. Historical rows stay marked even after the latch is cleared." />}
-      {(room.error || diagnostics.error) && <ErrorNote>{room.error || diagnostics.error}</ErrorNote>}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <div className="min-h-[420px]">
-          <CameraStage
-            streamUrl={streamUrl}
-            sourceWidth={sourceWidth}
-            sourceHeight={sourceHeight}
-            items={overlayItems(inspection)}
-            roi={activeRecipe?.definition.roi}
-            simulation={inspection?.simulation}
-            title={inspection ? `${inspection.productClass} · ${inspection.decision} · ${inspection.destinationBin}` : 'Waiting for an inspection'}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2 content-start">
-          <StatusPill label="API" value={report?.api ?? '…'} tone={healthTone(report?.api)} />
-          <StatusPill label="Vision" value={report?.vision ?? '…'} tone={healthTone(report?.vision)} />
-          <StatusPill label="AI engine" value={report ? `${report.modelStatus}${report.modelVersion ? ` · ${report.modelVersion}` : ''}` : '…'} tone={healthTone(report?.modelStatus)} />
-          <StatusPill label="MQTT" value={report?.mqtt ?? '…'} tone={healthTone(report?.mqtt)} />
-          <StatusPill label="ESP32" value={report?.esp32 ?? '…'} tone={healthTone(report?.esp32)} />
-          <StatusPill label="SignalR" value={connection} tone={connection === 'connected' ? 'good' : 'warn'} />
-          <StatusPill label="Conveyor" value={conveyor ? (conveyor.isRunning ? `Running ${conveyor.speed}` : 'Stopped') : '…'} tone={conveyor?.isEmergencyStopped ? 'bad' : conveyor?.isRunning ? 'good' : 'warn'} />
-          <StatusPill label="Fire" value={conveyor?.isFireDetected ? 'Fire detected' : 'Clear'} tone={conveyor?.isFireDetected ? 'bad' : 'good'} />
-          <StatusPill label="Temperature" value={conveyor ? `${conveyor.temperature} °C` : '…'} />
-          <StatusPill label="Humidity" value={conveyor ? `${conveyor.humidity} %` : '…'} />
-          <StatusPill label="Recipe" value={room.data?.activeRecipe ?? 'None'} />
-          <StatusPill label="Product" value={room.data?.currentProduct?.publicCode ?? 'None'} />
-          <StatusPill label="Last result" value={inspection ? `${inspection.decision} ${Math.round(inspection.confidence * 100)}%` : 'None'} tone={decisionTone(inspection?.decision)} />
-          <StatusPill label="Destination" value={inspection?.destinationBin ?? '—'} />
-        </div>
-      </div>
-      <p className="text-xs text-text-muted">Production counts below exclude simulation.</p>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatusPill label="Total" value={String(room.data?.totalCount ?? 0)} />
-        <StatusPill label="Accepted" value={String(room.data?.acceptedCount ?? 0)} tone="good" />
-        <StatusPill label="Rejected" value={String(room.data?.rejectedCount ?? 0)} tone="bad" />
-        <StatusPill label="Manual review" value={String(room.data?.manualReviewCount ?? 0)} tone="warn" />
-        <StatusPill label="Yield" value={room.data?.yieldPercent == null ? '—' : `${room.data.yieldPercent}%`} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ConveyorCard />
-        <div className="lg:col-span-2"><EnvironmentPanel /></div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel title="Bin counts">
-          <ul className="space-y-2 text-sm">
-            {(room.data?.binCounts ?? []).map(bin => (
-              <li key={bin.destinationBin} className="flex justify-between gap-3"><span>{bin.destinationBin}</span><span className="font-mono">{bin.count}</span></li>
-            ))}
-            {room.data && room.data.binCounts.length === 0 && <li className="text-text-muted">No inspections yet.</li>}
-          </ul>
-        </Panel>
-        <Panel title="Recent events">
-          <ul className="max-h-56 space-y-2 overflow-auto text-sm">
-            {(room.data?.recentEvents ?? []).map(event => (
-              <li key={`${event.createdAt}-${event.eventType}-${event.message}`}>
-                <div className="text-text-muted">{formatTime(event.createdAt)} · {event.eventType}</div>
-                <div>{event.message}</div>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-        <Panel title="Active alerts">
-          <ul className="space-y-2 text-sm">
-            {activeAlerts.filter(alert => alert.isActive).map(alert => (
-              <li key={alert.id} className="text-danger-light">{alert.alertType}</li>
-            ))}
-            {activeAlerts.every(alert => !alert.isActive) && <li className="text-text-muted">No active alerts.</li>}
-          </ul>
-        </Panel>
-      </div>
-      <SimulationPanel onChanged={() => { room.reload(); diagnostics.reload() }} />
+  const stale = !!room.error || !!diagnostics.error || (!!room.data && (connection !== 'connected' || [room.lastSuccessAt, diagnostics.lastSuccessAt].some(at => at !== null && now - at > 30_000)))
+  const problems: MessageKey[] = []
+  if (room.error || diagnostics.error) problems.push('API unavailable')
+  if (connection !== 'connected') problems.push('Live updates unavailable')
+  if (conveyor?.isEmergencyStopped) problems.push('Emergency latch active')
+  if (conveyor?.isFireDetected) problems.push('Fire sensor active')
+  if (conveyor?.isFireGenerationFault) problems.push('Fire sensor must be reprovisioned')
+  if (report) {
+    if (!['healthy', 'mock'].includes(report.api.toLowerCase())) problems.push('API unavailable')
+    if (!['healthy', 'mock'].includes(report.database.toLowerCase())) problems.push('Database')
+    if (!['healthy', 'online', 'mock'].includes(report.vision.toLowerCase())) problems.push('Vision unavailable')
+    if (!['connected', 'mock'].includes(report.mqtt.toLowerCase())) problems.push('MQTT unavailable')
+    if (!['online', 'mock'].includes(report.esp32.toLowerCase())) problems.push('Device unavailable')
+    if (!['online', 'healthy', 'mock'].includes(report.camera.toLowerCase())) problems.push('Camera unavailable')
+    if (!['loaded', 'mock'].includes(report.modelStatus.toLowerCase())) problems.push('Model unavailable')
+  }
+  const alerts = activeAlerts.filter(alert => alert.isActive)
+  const tone = decisionTone(inspection?.decision)
+  return <div className="production-page">
+    <div className="page-heading"><div><p className="eyebrow">SmartLine</p><h1>{t('Production')}</h1></div>
+      <span className="text-xs text-text-muted">{t('Inspection totals exclude simulation.')}</span></div>
+    {room.data?.simulationActive && <SimulationBanner text={t('Simulation data is visible.')} />}
+    {stale && <div role="status" className="connection-banner">{t('Connection lost · showing last known values')}
+      <span>{t('Last successful update')}: {room.lastSuccessAt ? date(new Date(room.lastSuccessAt).toISOString()) : '—'}</span></div>}
+    <ProductionCounters />
+    <div className="monitor-grid">
+      <section aria-label={t('Live preview')} className="min-w-0">
+        <CameraStage
+          sourceWidth={recipe?.definition.cameraProfile.sourceWidth || 240}
+          sourceHeight={recipe?.definition.cameraProfile.sourceHeight || 176}
+          roi={recipe?.definition.roi} />
+      </section>
+      <section className={`result-card result-${tone}`} aria-labelledby="last-evaluation-heading">
+        <div className="section-heading"><h2 id="last-evaluation-heading">{t('Last evaluation')}</h2><span className="eyebrow">{t('Stored inspection')}</span></div>
+        {inspection ? <>
+          <div className="result-decision"><span aria-hidden="true">{tone === 'good' ? '✓' : tone === 'bad' ? '×' : '!'}</span>{text(inspection.decision)}</div>
+          {inspection.simulation && <span className="text-sm font-semibold text-warning-light">{t('SIMULATION')}</span>}
+          <div className="result-product">{inspection.productClass}</div>
+          <dl className="result-summary">
+            <div><dt>{t('Confidence')}</dt><dd>{number(inspection.confidence * 100, { maximumFractionDigits: 1 })}%</dd></div>
+            <div><dt>{t('Destination')}</dt><dd>{inspection.destinationBin}</dd></div>
+            <div><dt>{t('Processed')}</dt><dd>{date(inspection.processedAt)}</dd></div>
+          </dl>
+          <details className="inline-details"><summary>{t('Evaluation details')}</summary><InspectionDetails inspection={inspection} /></details>
+        </> : <div className="empty-result"><span aria-hidden="true">—</span><h3>{room.data ? t('No evaluation yet') : t('Waiting for data')}</h3><p>{t('Results will appear here when the API records an inspection.')}</p></div>}
+      </section>
     </div>
-  )
+    <p className="text-xs text-text-muted">{t('Camera preview and the last evaluation may belong to different moments.')}</p>
+    <div className="production-footer">
+      <span>{t('Temperature')} <strong>{conveyor ? `${number(conveyor.temperature, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}°C` : '—'}</strong></span>
+      <span>{t('Humidity')} <strong>{conveyor ? `${number(conveyor.humidity)}%` : '—'}</strong></span>
+      <span>{t('Fan:')} <strong>{conveyor ? t(conveyor.fanActive ? 'On' : 'Off') : '—'}</strong></span>
+      <span>{t('Active alerts')} <strong>{number(alerts.length)}</strong></span>
+    </div>
+    {(problems.length > 0 || alerts.length > 0) && <section className="problem-strip" aria-label={t('System needs attention')}>
+      <div className="section-heading"><h2>{t('System needs attention')}</h2><button type="button" className="text-link" onClick={() => navigate('/management/diagnostics')}>{t('View system details')} →</button></div>
+      <ul>{[...new Set(problems)].map(problem => <li key={problem}>{t(problem)}</li>)}{alerts.map(alert => <li key={alert.id}>{text(alert.alertType)}</li>)}</ul>
+    </section>}
+  </div>
 }

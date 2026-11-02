@@ -1,3 +1,4 @@
+import { useLanguage } from '../../i18n/LanguageContext'
 interface Threshold {
   value: number
   color: string
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function GaugeBase({ value, min, max, unit, label, thresholds, defaultColor = '#3b82f6' }: Props) {
+  const { number, text } = useLanguage()
   const range = max - min
   const clamped = Math.min(Math.max(value, min), max)
   const ratio = (clamped - min) / range
@@ -43,7 +45,7 @@ export default function GaugeBase({ value, min, max, unit, label, thresholds, de
   return (
     <div className="flex flex-col items-center">
       <svg viewBox="0 0 100 80" className="w-full max-w-[180px]">
-        <path d={arcPath(-135, 135, r)} fill="none" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
+        <path d={arcPath(-135, 135, r)} fill="none" stroke="var(--color-card-border)" strokeWidth="6" strokeLinecap="round" />
         {ratio > 0.005 && (
           <path d={arcPath(startAngle, endAngle, r)} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" />
         )}
@@ -59,9 +61,9 @@ export default function GaugeBase({ value, min, max, unit, label, thresholds, de
         <circle cx={cx} cy={cy} r="3" fill={color} />
       </svg>
       <div className="text-2xl font-bold tabular-nums -mt-2" style={{ color }}>
-        {typeof value === 'number' ? value.toFixed(1) : '—'}{unit}
+        {typeof value === 'number' ? number(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}{unit}
       </div>
-      <div className="text-xs text-text-muted mt-0.5">{label}</div>
+      <div className="text-xs text-text-muted mt-0.5">{text(label)}</div>
     </div>
   )
 }

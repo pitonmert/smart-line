@@ -1,4 +1,6 @@
+import type { DisplayText } from '../../i18n/language'
 import type { ReactNode } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 export function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -28,13 +30,15 @@ export function StatusPill({ label, value, tone = 'neutral' }: { label: string; 
 }
 
 export function SimulationBanner({ text }: { text: string }) {
+  const { t, text: localizeText } = useLanguage()
   return (
     <div className="rounded-lg border border-warning/50 bg-warning/15 px-4 py-2 text-sm font-semibold tracking-wide text-warning-light">
-      SIMULATION MODE — {text}
+      {t('SIMULATION MODE')} — {localizeText(text)}
     </div>
   )
 }
 
-export function ErrorNote({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger-light">{children}</p>
+export function ErrorNote({ children }: { children: ReactNode | DisplayText }) {
+  const { text } = useLanguage()
+  return <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger-light">{typeof children === 'string' || (children && typeof children === 'object' && 'raw' in children) ? text(children as DisplayText) : children}</p>
 }

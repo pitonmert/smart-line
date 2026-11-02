@@ -32,6 +32,8 @@
 !SmartLine.Dashboard/tsconfig.json
 !SmartLine.Dashboard/tsconfig.node.json
 !SmartLine.Dashboard/vite.config.ts
+!SmartLine.Dashboard/dev/
+!SmartLine.Dashboard/dev/mock-server.ts
 !SmartLine.Dashboard/public/
 !SmartLine.Dashboard/public/**
 !SmartLine.Dashboard/src/

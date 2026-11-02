@@ -20,7 +20,7 @@ export function useDashboard() {
         console.error('[Dashboard] Veri yüklenemedi:', err)
         dispatch({
           type: 'SET_ERROR',
-          payload: getApiErrorMessage(err, 'Dashboard verileri yüklenemedi.'),
+          payload: getApiErrorMessage(err, 'Dashboard data could not be loaded.'),
         })
       })
   }, [dispatch])

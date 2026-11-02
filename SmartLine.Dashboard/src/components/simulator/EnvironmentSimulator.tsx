@@ -1,12 +1,15 @@
+import type { DisplayText } from '../../i18n/language'
+import { useLanguage } from '../../i18n/LanguageContext'
 import { useState } from 'react'
 import { FaThermometerHalf } from 'react-icons/fa'
 import { api, getApiErrorMessage } from '../../api/client'
 
 export default function EnvironmentSimulator() {
+  const { t, text } = useLanguage()
   const [temperature, setTemperature] = useState(25)
   const [humidity, setHumidity] = useState(50)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<DisplayText | null>(null)
 
   const send = async (temp: number, hum: number) => {
     setLoading(true)
@@ -14,7 +17,7 @@ export default function EnvironmentSimulator() {
     try {
       await api.sendEnvironmentData(temp, hum)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Gönderilemedi.'))
+      setError(getApiErrorMessage(err, 'Could not send.'))
     } finally {
       setLoading(false)
     }
@@ -38,13 +41,11 @@ export default function EnvironmentSimulator() {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-text">
-        <FaThermometerHalf className="text-warning-light" />
-        Ortam Simülasyonu
-      </h3>
+        <FaThermometerHalf className="text-warning-light" />{t("Environment simulation")}</h3>
 
       {/* Sıcaklık */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-text-muted">Sıcaklık</label>
+        <label className="text-xs text-text-muted">{t("Temperature")}</label>
         <div className="relative">
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full opacity-30 pointer-events-none" style={{ background: tempGradient }} />
           <input
@@ -71,7 +72,7 @@ export default function EnvironmentSimulator() {
 
       {/* Nem */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-text-muted">Nem</label>
+        <label className="text-xs text-text-muted">{t("Humidity")}</label>
         <div className="relative">
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full opacity-30 pointer-events-none" style={{ background: humGradient }} />
           <input
@@ -100,28 +101,20 @@ export default function EnvironmentSimulator() {
       <button
         onClick={handleSend}
         disabled={loading}
-        className="w-full py-1.5 text-xs font-medium rounded bg-primary hover:bg-primary-light text-white disabled:opacity-50 transition-colors"
+        className="w-full py-1.5 text-xs font-medium rounded bg-primary hover:brightness-110 text-white disabled:opacity-50 transition-colors"
       >
-        {loading ? 'Gönderiliyor...' : 'Gönder'}
+        {loading ? t('Sending…') : t('Send')}
       </button>
 
       {/* Preset butonları */}
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => handlePreset(25, 50)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-success/20 text-success-light hover:bg-success/30 disabled:opacity-50 transition-colors">
-          Normal (25°C, %50)
-        </button>
-        <button onClick={() => handlePreset(38)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-warning/20 text-warning-light hover:bg-warning/30 disabled:opacity-50 transition-colors">
-          Sıcak (38°C)
-        </button>
-        <button onClick={() => handlePreset(42)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-danger/20 text-danger-light hover:bg-danger/30 disabled:opacity-50 transition-colors">
-          Alarm (42°C)
-        </button>
-        <button onClick={() => handlePreset(55)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-danger/20 text-danger-light hover:bg-danger/30 disabled:opacity-50 transition-colors">
-          Aşırı (55°C)
-        </button>
+        <button onClick={() => handlePreset(25, 50)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-success/20 text-success-light hover:bg-success/30 disabled:opacity-50 transition-colors">{t("Normal (25°C, 50%)")}</button>
+        <button onClick={() => handlePreset(38)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-warning/20 text-warning-light hover:bg-warning/30 disabled:opacity-50 transition-colors">{t("Hot (38°C)")}</button>
+        <button onClick={() => handlePreset(42)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-danger/20 text-danger-light hover:bg-danger/30 disabled:opacity-50 transition-colors">{t("Alarm (42°C)")}</button>
+        <button onClick={() => handlePreset(55)} disabled={loading} className="px-2 py-1.5 text-xs rounded bg-danger/20 text-danger-light hover:bg-danger/30 disabled:opacity-50 transition-colors">{t("Extreme (55°C)")}</button>
       </div>
 
-      {error && <p className="text-xs text-danger-light">{error}</p>}
+      {error && <p className="text-xs text-danger-light">{text(error)}</p>}
     </div>
   )
 }

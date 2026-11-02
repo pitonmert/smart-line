@@ -4,10 +4,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 const API_TARGET = process.env.API_TARGET ?? 'http://localhost:5047'
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(async ({ command, mode }) => ({
+  plugins: [react(), tailwindcss(), ...(command === 'serve' && mode === 'mock'
+    ? [(await import('./dev/mock-server.ts')).mockServer()]
+    : [])],
   server: {
-    proxy: {
+    proxy: mode === 'mock' ? undefined : {
       '/api': {
         target: API_TARGET,
         changeOrigin: true,
@@ -16,4 +18,4 @@ export default defineConfig({
       '/hubs': { target: API_TARGET, ws: true, changeOrigin: true },
     },
   },
-})
+}))

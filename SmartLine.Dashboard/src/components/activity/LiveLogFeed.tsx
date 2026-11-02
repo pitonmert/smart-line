@@ -1,3 +1,4 @@
+import { useLanguage } from '../../i18n/LanguageContext'
 import { FaListAlt } from 'react-icons/fa'
 import { useDashboardState } from '../../context/DashboardContext'
 
@@ -8,17 +9,18 @@ const severityStyles: Record<string, string> = {
 }
 
 export default function LiveLogFeed() {
+  const { t, time } = useLanguage()
   const { recentLogs } = useDashboardState()
 
   return (
     <section className="rounded-xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-center gap-2">
         <FaListAlt className="text-primary-light" />
-        <h2 className="text-base font-semibold">Canlı Sistem Akışı</h2>
+        <h2 className="text-base font-semibold">{t("Live system activity")}</h2>
       </div>
 
       {recentLogs.length === 0 ? (
-        <p className="text-sm text-text-muted">Yeni sistem olayı bekleniyor.</p>
+        <p className="text-sm text-text-muted">{t("Waiting for a system event.")}</p>
       ) : (
         <div className="grid gap-2 md:grid-cols-2">
           {recentLogs.map(log => (
@@ -31,7 +33,7 @@ export default function LiveLogFeed() {
                 {log.message && <p className="mt-0.5 truncate text-text-muted">{log.message}</p>}
               </div>
               <time className="shrink-0 font-mono text-text-muted">
-                {new Date(log.createdAt).toLocaleTimeString('tr-TR')}
+                {time(log.createdAt)}
               </time>
             </article>
           ))}

@@ -1,10 +1,12 @@
+import type { DisplayText } from '../i18n/language'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getApiErrorMessage } from '../api/client'
 
 export function usePolling<T>(load: () => Promise<T>, intervalMs = 4000, deps: readonly unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<DisplayText | null>(null)
   const loadRef = useRef(load)
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [generation, setGeneration] = useState(0)
   const signature = JSON.stringify(deps)
 
@@ -20,7 +22,7 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs = 4000, deps: r
     const poll = async () => {
       try {
         const value = await loadRef.current()
-        if (active) { setData(value); setError(null) }
+        if (active) { setData(value); setError(null); setLastSuccessAt(Date.now()) }
       } catch (reason) { if (active) setError(getApiErrorMessage(reason, 'Request failed.')) }
       finally { if (active) timer = window.setTimeout(poll, intervalMs) }
     }
@@ -31,5 +33,5 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs = 4000, deps: r
     }
   }, [generation, signature, intervalMs])
 
-  return { data, error, reload }
+  return { data, error, reload, lastSuccessAt }
 }

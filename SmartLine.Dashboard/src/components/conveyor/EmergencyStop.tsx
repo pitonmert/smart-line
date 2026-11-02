@@ -1,3 +1,5 @@
+import type { DisplayText } from '../../i18n/language'
+import { useLanguage } from '../../i18n/LanguageContext'
 import { useState } from 'react'
 import { FaExclamationTriangle, FaPause, FaPlay, FaUndo } from 'react-icons/fa'
 import { api, getApiErrorMessage } from '../../api/client'
@@ -13,12 +15,13 @@ interface Props {
 type Action = 'start' | 'stop' | 'emergency-stop' | 'emergency-reset'
 
 export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDetected, isFireGenerationFault }: Props) {
+  const { t, text } = useLanguage()
   const [loading, setLoading] = useState<Action | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<DisplayText | null>(null)
   const dispatch = useDashboardDispatch()
 
   const run = async (action: Action) => {
-    if (action === 'emergency-stop' && !confirm('ACİL DURDURMA kilidini etkinleştirmek istediğinize emin misiniz?')) return
+    if (action === 'emergency-stop' && !confirm(t('Enable the emergency-stop latch?'))) return
 
     setLoading(action)
     setError(null)
@@ -31,7 +34,7 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
       }[action]()
       dispatch({ type: 'UPDATE_CONVEYOR', payload: status })
     } catch (actionError) {
-      setError(getApiErrorMessage(actionError, 'Konveyör komutu uygulanamadı.'))
+      setError(getApiErrorMessage(actionError, 'The conveyor command could not be applied.'))
     } finally {
       setLoading(null)
     }
@@ -45,10 +48,10 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
           <button
             onClick={() => run('stop')}
             disabled={loading !== null}
-            className="flex items-center gap-1.5 rounded bg-warning px-3 py-1.5 text-xs text-white transition-colors hover:bg-warning-light disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded bg-warning px-3 py-1.5 text-xs text-white transition-colors hover:brightness-110 disabled:opacity-50"
           >
             <FaPause className="text-[10px]" />
-            {loading === 'stop' ? 'Durduruluyor...' : 'Normal durdur'}
+            {loading === 'stop' ? t('Stopping…') : t('Normal stop')}
           </button>
         ) : (
           <button
@@ -57,17 +60,17 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
             className="flex items-center gap-1.5 rounded bg-success px-3 py-1.5 text-xs text-white transition-colors hover:bg-success-light disabled:opacity-50"
           >
             <FaPlay className="text-[10px]" />
-            {loading === 'start' ? 'Başlatılıyor...' : 'Başlat'}
+            {loading === 'start' ? t('Starting…') : t('Start')}
           </button>
         )}
 
         <button
           onClick={() => run('emergency-stop')}
           disabled={loading !== null || isEmergencyStopped}
-          className="flex items-center gap-1.5 rounded bg-danger px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-danger-light disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded bg-danger px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-50"
         >
           <FaExclamationTriangle className="text-[10px]" />
-          {loading === 'emergency-stop' ? 'Durduruluyor...' : 'Acil durdur'}
+          {loading === 'emergency-stop' ? t('Stopping…') : t('Emergency stop')}
         </button>
 
         {isEmergencyStopped && (
@@ -76,19 +79,19 @@ export default function EmergencyStop({ isRunning, isEmergencyStopped, isFireDet
             disabled={loading !== null || isFireDetected || isFireGenerationFault}
             title={
               isFireGenerationFault
-                ? 'Yangın sensörü yeniden provision edilmeden kilit açılamaz.'
+                ? t('Reprovision the fire sensor before resetting the latch.')
                 : isFireDetected
-                  ? 'Yangın sensörü temizlenmeden kilit açılamaz.'
+                  ? t('Clear the fire sensor before resetting the latch.')
                   : undefined
             }
             className="flex items-center gap-1.5 rounded border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary-light transition-colors hover:bg-primary/20 disabled:opacity-50"
           >
             <FaUndo className="text-[10px]" />
-            {loading === 'emergency-reset' ? 'Açılıyor...' : 'Kilidi aç'}
+            {loading === 'emergency-reset' ? t('Resetting…') : t('Reset latch')}
           </button>
         )}
       </div>
-      {error && <p role="alert" className="text-right text-xs text-danger-light">{error}</p>}
+      {error && <p role="alert" className="text-right text-xs text-danger-light">{text(error)}</p>}
     </div>
   )
 }

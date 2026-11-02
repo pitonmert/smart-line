@@ -1,9 +1,3 @@
-export function formatTime(value?: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
-}
-
 export function decisionTone(decision?: string | null): 'good' | 'bad' | 'warn' | 'neutral' {
   if (decision === 'PASS') return 'good'
   if (decision === 'REJECT') return 'bad'

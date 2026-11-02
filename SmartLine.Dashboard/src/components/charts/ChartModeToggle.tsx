@@ -1,6 +1,8 @@
+import { useLanguage } from '../../i18n/LanguageContext'
 import { useDashboardState, useDashboardDispatch } from '../../context/DashboardContext'
 
 export default function ChartModeToggle() {
+  const { t } = useLanguage()
   const { chartMode } = useDashboardState()
   const dispatch = useDashboardDispatch()
 
@@ -9,15 +11,11 @@ export default function ChartModeToggle() {
       <button
         onClick={() => dispatch({ type: 'SET_CHART_MODE', payload: 'live' })}
         className={`px-3 py-1.5 transition-colors ${chartMode === 'live' ? 'bg-primary-light text-white' : 'text-text-muted hover:text-text'}`}
-      >
-        Canlı
-      </button>
+      >{t("Live")}</button>
       <button
         onClick={() => dispatch({ type: 'SET_CHART_MODE', payload: 'historical' })}
         className={`px-3 py-1.5 transition-colors ${chartMode === 'historical' ? 'bg-primary-light text-white' : 'text-text-muted hover:text-text'}`}
-      >
-        Geçmiş
-      </button>
+      >{t("History")}</button>
     </div>
   )
 }
