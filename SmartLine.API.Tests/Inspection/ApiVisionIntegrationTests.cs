@@ -17,12 +17,26 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
         Assert.NotNull(root);
         using var server = Process.Start(new ProcessStartInfo("python3", Path.Combine(root.FullName, "test-support", "vision", "inspection_server.py"))
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, Environment = { ["SMARTLINE_TEST_CAPTURE_DELAY"] = "3.2" } })!;
+        var serverErrors = server.StandardError.ReadToEndAsync();
         var options = Fixture.GetRequiredService<IOptions<VisionEndpointOptions>>().Value;
         var oldUrl = options.HealthUrl;
         try
         {
-            var port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.True(int.TryParse(port, out _), "Vision server did not return a port.");
+            string? port = null;
+            try
+            {
+                port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException)
+            {
+                // Terminate the stalled process below before awaiting its error stream.
+            }
+            if (!int.TryParse(port, out var portNumber) || portNumber is < 1 or > 65535)
+            {
+                if (!server.HasExited) server.Kill(true);
+                await server.WaitForExitAsync();
+                Assert.Fail($"Vision server did not return a valid port within 10 seconds. Exit code: {server.ExitCode}.\nStandard output: {port ?? "<none>"}\nStandard error:\n{await serverErrors}");
+            }
             options.HealthUrl = $"http://127.0.0.1:{port}/health";
             var client = Fixture.CreateClient();
             var id = Guid.NewGuid();
@@ -40,6 +54,7 @@ public sealed class ApiVisionIntegrationTests(ApiFixture fixture) : ApiTestBase(
             options.HealthUrl = oldUrl;
             if (!server.HasExited) server.Kill(true);
             await server.WaitForExitAsync();
+            await serverErrors;
         }
     }
 }
