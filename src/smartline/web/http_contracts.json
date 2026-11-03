@@ -1,0 +1,344 @@
+[
+  {
+    "path": "/api/alerts",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/alerts/active",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/alerts/type/{type}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/alerts/{id:int}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/alerts/{id:int}/resolve",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/calibration-profiles",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/calibration-profiles/active",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/calibration-profiles/{id:guid}",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "path": "/api/calibration-profiles/{id:guid}/activate",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/camera/preview",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/control-room",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/conveyor/emergency-reset",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/conveyor/emergency-stop",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/conveyor/speed",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/conveyor/start",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/conveyor/status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/conveyor/stop",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/dashboard",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/active",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/{id:guid}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/{id:guid}/captures/camera",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/{id:guid}/images/{fileName}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/{id:guid}/samples/{sampleId:guid}",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "path": "/api/dataset/sessions/{id:guid}/stop",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/diagnostics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/inspections",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/inspections/vision",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/inspections/{id:guid}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/logs",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/logs/event/{eventType}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/logs/severity/{level}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/products",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/products/barcode/{barcode}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/products/color/{color}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/products/defective",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/products/status/{status}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/products/{id:int}",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/recipes",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/recipes/active",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/recipes/active/snapshot",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/recipes/{id:guid}",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "path": "/api/recipes/{id:guid}/activate",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/sensors/barcode",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/sensors/environment",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/sensors/fire",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/sensors/status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/simulation/arrivals",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/simulation/clear",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/simulation/status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/simulation/tick",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "path": "/api/statistics/daily",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/statistics/hourly",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/tracking",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/tracking/queue",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "path": "/api/tracking/{id:guid}/release",
+    "methods": [
+      "POST"
+    ]
+  }
+]

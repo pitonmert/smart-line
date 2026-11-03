@@ -1,0 +1,74 @@
+services:
+  mosquitto:
+    ports: !reset []
+    restart: "no"
+
+  mqtt-test-client:
+    image: eclipse-mosquitto:2
+    entrypoint: ["/bin/sh", "/test/verify-acl.sh"]
+    command: []
+    environment:
+      MQTT_API_PASSWORD: ${MQTT_API_PASSWORD}
+      MQTT_FIRMWARE_PASSWORD: ${MQTT_FIRMWARE_PASSWORD}
+      MQTT_VISION_PASSWORD: ${MQTT_VISION_PASSWORD}
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 8883
+      MQTT_TEST_CERT_DIR: /test/certs
+    volumes:
+      - type: bind
+        source: ../tests/support/mqtt/verify-acl.sh
+        target: /test/verify-acl.sh
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/ca.crt
+        target: /test/certs/ca.crt
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-api.crt
+        target: /test/certs/smartline-api.crt
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-api.key
+        target: /test/certs/smartline-api.key
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-firmware.crt
+        target: /test/certs/smartline-firmware.crt
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-firmware.key
+        target: /test/certs/smartline-firmware.key
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-vision.crt
+        target: /test/certs/smartline-vision.crt
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-vision.key
+        target: /test/certs/smartline-vision.key
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_MQTT_TEST_CERT_DIR:-/tmp/smartline-mqtt-test-certs}/untrusted-client.crt
+        target: /test/certs/untrusted-client.crt
+        read_only: true
+      - type: bind
+        source: ${SMARTLINE_MQTT_TEST_CERT_DIR:-/tmp/smartline-mqtt-test-certs}/untrusted-client.key
+        target: /test/certs/untrusted-client.key
+        read_only: true
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    networks: [backend]
+    read_only: true
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    cap_drop: [ALL]
+    # Certificate files are bind-mounted read-only from the CI runner's host
+    # user with mode 0600. Without DAC_READ_SEARCH, root inside the container
+    # is subject to normal Unix permission checks and cannot read them on
+    # native Linux (this is masked on Docker Desktop's VM-backed bind mounts,
+    # which is why the gap only surfaces in CI).
+    cap_add: [DAC_READ_SEARCH]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"

@@ -1,7 +1,0 @@
-opencv-python==4.10.0.84
-pyzbar==0.1.9
-paho-mqtt==2.1.0
-onnxruntime==1.22.1
-openvino==2026.4.1
-
-Pillow==12.3.0

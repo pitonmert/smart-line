@@ -1,0 +1,57 @@
+name: smartline-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: smartline_python
+      POSTGRES_USER: smartline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [python_dev_postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartline -d smartline_python"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  web:
+    build: {context: .., dockerfile: deploy/Dockerfile, target: development}
+    command: [smartline, web, --host, 0.0.0.0, --port, "8000"]
+    environment:
+      SMARTLINE_ENV: development
+      DB_HOST: postgres
+      DB_NAME: smartline_python
+      DB_USER: smartline
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      MQTT_ENABLED: "false"
+      VISION_URL: http://vision:8090
+      DATASET_ROOT: /var/lib/smartline/datasets
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [python_dev_datasets:/var/lib/smartline/datasets]
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [backend]
+
+  vision:
+    build: {context: .., dockerfile: deploy/Dockerfile, target: development}
+    command: [smartline, vision]
+    environment:
+      VISION_REQUIRE_MQTT: "false"
+      VISION_CONTROL_HOST: 0.0.0.0
+      API_BASE_URL: http://web:8000
+      CAM_STREAM_URL: ${CAM_STREAM_URL:-http://192.168.1.50:81/stream}
+      CAM_CAPTURE_URL: ${CAM_CAPTURE_URL:-}
+      MODEL_PATH: ${MODEL_PATH:-}
+      MODEL_VERSION: ${MODEL_VERSION:-}
+      ALLOW_PREVIEW_FALLBACK: "false"
+    volumes: [./models:/opt/smartline/models:ro]
+    depends_on: [web]
+    networks: [backend]
+
+volumes:
+  python_dev_postgres_data:
+  python_dev_datasets:
+networks:
+  backend:

@@ -1,330 +1,183 @@
-# SmartLine AI
+# SmartLine
 
-SmartLine is an AI-assisted industrial conveyor inspection and sorting prototype. A product arrives, an inspection is triggered, one camera frame is selected, and the active Product Recipe decides the class, color, size, defects, and destination. The result is tracked along the belt, stored, and shown in the control center.
-
-The core is recipe-driven. DemoBox is the first pipeline, with `BOX_RED`, `BOX_BLUE`, and `BOX_GREEN`. The same decision engine can later run Apple, Bag, ElectronicPart, Package, or another recipe without a rewrite.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  CAM["ESP32-CAM GC2145<br/>RGB565 to JPEG MJPEG"] --> VISION["SmartLine.Vision<br/>event inspection"]
-  ESP["ESP32 controller"] -->|MQTT TLS environment and fire| MQTT["Mosquitto ACL"]
-  VISION -->|MQTT barcode only| MQTT
-  VISION -->|HTTP inspection| API["SmartLine.API"]
-  MQTT --> API
-  API --> DB["PostgreSQL"]
-  API -->|SignalR and REST| UI["Control center"]
-```
-
-Inspection does not run a model on every preview frame.
-
-```mermaid
-flowchart TD
-  A["Product event"] --> B{"Trigger"}
-  B -->|manual, API, or simulator| C["Select latest frame"]
-  B -->|VL53L1X hardware| H["Rejected until integration"]
-  C --> D["Detect, color ROI, visual size"]
-  D --> E["API: recipe decision"]
-  E --> F["Track and sort queue"]
-  F --> G["History and control room"]
-```
-
-```mermaid
-flowchart LR
-  CAP["Local dataset capture"] --> VAL["Validate manifest"]
-  VAL --> UP["Upload labeled set to Kaggle"]
-  UP --> TR["Train YOLO26n"]
-  TR --> REV["Review real metrics"]
-  REV --> LOC["models/runtime ignored weights"]
-  LOC --> REG["Register on the recipe"]
-  REG --> INF["OpenVINO or ONNX on the Intel CPU"]
-```
-
-```mermaid
-stateDiagram-v2
-  [*] --> DETECTED
-  DETECTED --> CAPTURED
-  CAPTURED --> INSPECTING
-  INSPECTING --> DECIDED
-  INSPECTING --> MANUAL_REVIEW
-  DECIDED --> QUEUED_FOR_SORT
-  DECIDED --> MANUAL_REVIEW
-  QUEUED_FOR_SORT --> SORTED
-  MANUAL_REVIEW --> DECIDED
-  DETECTED --> FAILED
-  CAPTURED --> FAILED
-  INSPECTING --> FAILED
-  DECIDED --> FAILED
-  QUEUED_FOR_SORT --> FAILED
-  MANUAL_REVIEW --> FAILED
-```
-
-```mermaid
-flowchart TD
-  M["Measurement"] --> R["Recipe rules in priority order"]
-  R -->|any rejecting defect| REJ["REJECT_BIN"]
-  R -->|matching pass rule| BIN["Configured bin"]
-  R -->|no match or low confidence| HOLD["MANUAL_REVIEW"]
-```
-
-## Components
-
-| Project | Responsibility |
-| --- | --- |
-| `SmartLine.API` | Identity, recipes, inspection history, tracking, dataset sessions, PostgreSQL, MQTT, SignalR |
-| `SmartLine.API.Tests` | xUnit and PostgreSQL Testcontainers |
-| `SmartLine.Dashboard` | Industrial control center |
-| `SmartLine.Firmware` | ESP32 sensors, MQTT TLS, local emergency latch |
-| `SmartLine.Cam` | ESP32-CAM MJPEG stream |
-| `SmartLine.Vision` | Frame selection, barcode MQTT, event inspection |
-| `SmartLine.Training/` | Cloud training and dataset tools |
-
-PostgreSQL, MQTT, and the API run from Docker Compose. The dashboard uses Vite in development; in production the API serves the Dashboard build and endpoints from the same HTTPS origin. There is no CORS middleware. The API stays a single Minimal API instance. MediatR, Carter, a generic repository, and a unit of work are not used.
-
-## Camera
-
-The camera is an ESP32-CAM with a GC2145 sensor. The detected PID is `0x2145`. This sensor does not produce native JPEG. Firmware captures RGB565, converts it to JPEG in software, and publishes MJPEG.
-
-The current live preview target is:
+Factory monitoring, recipe-based visual inspection, and ESP32 device control. Python 3.12 and Django 5.2 run the web application and image processing as two processes of one project.
 
 ```text
-http://192.168.1.50:81/stream
+Browser / TV ── Django web/system ── PostgreSQL
+                       │
+                       ├── Mosquitto ── ESP32 controller
+                       │
+                       └── image process ── ESP32 camera
 ```
 
-Live preview uses HQVGA, 240×176, so the software JPEG conversion can keep a usable frame rate. Do not raise that stream resolution to improve the preview. Dataset and inspection prefer `GET /capture/raw`, which returns the VGA RGB565 frame. Vision converts that frame to BGR on the host and encodes JPEG there. `GET /capture` remains the JPEG snapshot for a browser and for fallback. The firmware keeps the preview sensor at HQVGA. A still locks the camera, reinitializes the RGB565 buffer at the configured still size, copies the frame, and restores HQVGA before it unlocks. Changing framesize without that reinitialization is not safe on this ESP32 camera library, because the DMA buffer length is fixed at init. The default still size is VGA, 640×480, and only when PSRAM is present. Without PSRAM the still endpoints report `still_requires_psram` and do not pretend the preview frame is larger. `GET /status` reports the last capture's stage times and, separately, the last HTTP body transfer. Still and stream images are written in 2048-byte chunks staged through separate per-send internal-RAM buffers, so the independent port-80 still task and port-81 stream task cannot overwrite each other. `GET /debug/throughput` sends a fixed payload without opening the camera, from internal RAM or from PSRAM, so a slow socket can be told apart from a slow capture. The capture preparation times already measured on the board stay about two seconds. A later board measurement showed an 8192-byte internal HTTP payload finishing in 0.187 seconds, while a 32768-byte internal payload with staging took 8.358 seconds: 16 chunks, one chunk at 2865 ms, and no transport error. JPEG preparation on that run was about 2.15 seconds. Port 9001 is a separate raw TCP sender for the same 32768 internal bytes in 2048-byte writes. The normal build does not open it. That comparison is not a measured result until the development build is flashed. AI inspection stays event-triggered. It does not infer every streamed frame.
+The web/system process owns recipe decisions, records, dataset storage, device state and browser notifications. The image process acquires images and produces observations; it does not choose destinations or write datasets. Training is offline and separate from production processing.
 
-Check one connected capture without flashing. The printed stage times are measurements from the board. They are not a speedup claim until this firmware has been flashed:
+Release notes are maintained in [GitHub Releases](https://github.com/pitonmert/smart-line/releases).
 
-```bash
-python3 SmartLine.Cam/scripts/camera_smoke.py --base http://192.168.1.50:81 --captures 1 --raw
+## Requirements
+
+- Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/) for local commands.
+- Docker with Compose for the PostgreSQL/Mosquitto/application stack.
+- PlatformIO for firmware builds; a C++17 compiler for firmware host tests.
+- Camera/model hardware is optional for the read-only mock preview.
+
+Run commands from the repository root unless a firmware guide says otherwise.
+
+## Preview without hardware
+
+```sh
+uv sync --frozen
+uv run --frozen smartline web --mock
 ```
 
-Measure body delivery without flashing and without a 50-capture run. A timeout is an incomplete row, not a throughput claim:
-
-```bash
-python3 SmartLine.Cam/scripts/transport_probe.py --base http://192.168.1.50:81
-```
-
-The raw TCP check needs a development build. `PLATFORMIO_BUILD_FLAGS` is appended to the existing Wi-Fi flags. The normal `esp32cam` build leaves port 9001 closed. Do not treat the printed rate as a fix until this build has been flashed:
-
-```bash
-export PLATFORMIO_BUILD_FLAGS="-DSMARTLINE_TCP_DIAG=1"
-pio run --project-dir SmartLine.Cam -e esp32cam -t upload
-python3 SmartLine.Cam/scripts/tcp_diag_probe.py --host 192.168.1.50 --port 9001
-```
-
-The 50-capture acceptance run stays later, after a single capture is usable. That command does not flash firmware:
-
-```bash
-python3 SmartLine.Cam/scripts/camera_smoke.py --base http://192.168.1.50:81 --captures 50 --raw
-```
-
-The control-room image uses CSS `object-fit: contain`. The bitmap is not upscaled by the camera. Bounding boxes stay in source pixels. The canvas applies the same scale and letterbox offset as the image, so a wider panel does not move the boxes. The overlay describes the last completed inspection, identified by its timestamp. It is not frame-locked to the live MJPEG element.
-
-## Product Recipes
-
-A recipe defines classes, allowed colors, size classes, defect classes, acceptance thresholds, sorting rules, destination bins, model name and version, camera profile, ROI, calibration profile, physical limits, and inspection settings. Rules live in the recipe. The vision model does not contain sorting logic.
-
-DemoBox accepts `GOOD` plus a color and size into `BIN_A`, `BIN_B`, or `BIN_C`. A rejecting defect goes to `REJECT_BIN`. Low confidence or an unmatched combination goes to `MANUAL_REVIEW`. The decision cases are in `SmartLine.API/Contracts/fixtures/decision-cases.json` and are executed by the C# engine. Vision supplies observations; only the API evaluates acceptance and selects a destination.
-
-## Vision and local inference
-
-Training happens in the cloud. Sorting inference should run locally so a decision does not wait on internet latency. The development machine is an Intel Core i5-11400F with 32 GB of RAM. OpenVINO on that CPU is the production inference target. ONNX Runtime is the portable CPU runtime. Ultralytics and PyTorch are the development runtime when a `.pt` file and the package are present.
-
-`InferenceEngine` chooses a backend from the artifact. A `.pt` file uses Ultralytics when that package is installed. An `.onnx` file and an OpenVINO directory use the Ultralytics runtime when it is installed, and otherwise ONNX Runtime or OpenVINO with the YOLO26 export contract: raw `(N, 4+classes, anchors)` or end-to-end `(N, 300, 6)`. Boxes come back as `x`, `y`, `width`, `height`, `label`, and `confidence` in source-image pixels. A missing model or a missing runtime returns no boxes and no latency figure. Nothing invents a detection. No frames-per-second target is claimed until a real inspection latency is measured. The design optimizes for one product at a time.
-
-Color is measured from the detected ROI or the recipe ROI, in HSV, with an optional white reference. Size is a visual estimate from pixels and `pixelsPerMillimeter`. `depthAvailable` stays false. A future fusion point can accept a simulated distance, and it ignores a hardware distance while the source is `NOT_INTEGRATED`.
-
-## Dataset collection
-
-Images and training artifacts are gitignored under `datasets/` and `models/runtime/`.
-
-Start a session from Dataset & AI, or:
-
-```bash
-curl -s -X POST http://localhost:5047/api/dataset/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"recipeId":null,"productClass":"BOX_RED","qualityLabel":"GOOD","colorLabel":"RED","sizeLabel":"LARGE","defectLabels":[],"notes":"bench sample","captureMode":"manual","intervalMs":null,"simulation":false}'
-```
-
-Capture one JPEG from the camera through Vision (up to 900 KB):
-
-```bash
-curl -s -X POST "http://localhost:5047/api/dataset/sessions/$SESSION/captures/camera" \
-  -H "Content-Type: application/json" \
-  -d '{"productClass":"BOX_RED","qualityLabel":"GOOD","colorLabel":"RED","sizeLabel":"LARGE","defectLabels":[]}'
-```
-
-The operator path does not start from a file picker. Dataset & AI shows the live preview, takes the class, quality, color, size, and defects from the active recipe, and `Capture from camera` asks the API to store one high-quality dataset still. The page then shows the thumbnail, measured pixel size, capture source, timestamp, labels, and capture count. If the still fails and preview fallback is disabled, the API returns an error and stores nothing. The browser does not read the MJPEG element. Optional interval capture repeats that same request with the labels on screen. An accidental sample can be discarded while the session is still active. PC file uploads are not supported. Vision fully decodes existing JPEG frames before returning them; the API checks payload size and basic JPEG framing without decoding them again. Existing PNG dataset images remain readable.
-
-The API database is the only recipe authority. Vision reads `GET /api/recipes/active/snapshot` without a device key. A validated snapshot on an inspection request is also accepted. `RECIPE_PATH` is only the offline fallback. Every stored inspection records the recipe version.
-
-The manifest records the operator labels, timestamp, camera metadata, file name, and SHA-256. `annotated` stays false. Bounding boxes are not invented. Hardware-trigger capture is rejected unless the session is explicitly marked simulation.
-
-Validate and export only real labels:
-
-```bash
-python3 SmartLine.Training/dataset_tools.py validate --manifest datasets/session/manifest.jsonl --images datasets/session/images
-python3 SmartLine.Training/dataset_tools.py export-yolo --manifest datasets/session/manifest.jsonl --images datasets/session/images --output datasets/yolo/demobox --classes BOX_RED,BOX_BLUE,BOX_GREEN
-```
-
-Draw boxes in CVAT or Label Studio using the recipe class names. Import those boxes back into the manifest with `annotated: true`, `sourceWidth`, and `sourceHeight`, or keep the tool's YOLO labels. Empty label files are allowed only for images that were reviewed and contain no object. Unannotated images are skipped.
-
-## Cloud training
-
-Do not train on the local AMD GPU. Kaggle Notebooks with a GPU are the primary path: `SmartLine.Training/notebooks/smartline_kaggle.ipynb`. Google Colab is the fallback: `SmartLine.Training/notebooks/smartline_colab.ipynb`. A RunPod GPU pod can run the same commands:
-
-```bash
-python3 -m pip install -r SmartLine.Training/requirements.txt
-python3 SmartLine.Training/train.py --config SmartLine.Training/configs/detect.yaml --execute
-python3 SmartLine.Training/evaluate.py --results runs/smartline/demobox-detect/results.csv
-python3 SmartLine.Training/export.py --weights runs/smartline/demobox-detect/weights/best.pt --execute
-```
-
-v0.2.0 supports detection preparation with Ultralytics YOLO26 (`yolo26n`). Classification and segmentation are deferred. Pins are in `SmartLine.Training/requirements.txt`. The Kaggle notebook checks CUDA, prints the GPU name and VRAM, installs those pins, refuses a dataset without labels, trains, validates, exports ONNX, prepares OpenVINO, and leaves the run folder for download. It contains no credentials.
-
-No training run has been executed in this repository. `models/registry/demobox.json` keeps `metrics` null. `evaluate.py` will not fill in accuracy, mAP, precision, or recall when `results.csv` is missing.
-
-## Activate a trained model
-
-1. Review the real `results.csv` and confusion matrix from the cloud run.
-2. Copy the chosen `.pt`, ONNX file, or OpenVINO directory into `models/runtime/`. Record the registry fields and SHA-256. Do not commit the binaries.
-3. Run `python3 SmartLine.Training/validate_registry.py --registry models/registry/demobox.json --recipe SmartLine.API/Contracts/recipes/demobox.json`. It exits 2 until the artifact exists, the checksum matches, the format is `.pt`, `.onnx`, `.xml`, or an OpenVINO directory, and the class list matches the recipe.
-4. Set the recipe `model.artifactFileName` and version with `PUT /api/recipes/{id}`.
-5. Point Vision at the artifact and run one manual inspection:
-
-```bash
-cd SmartLine.Vision/src
-MODEL_PATH=../../models/runtime/best_openvino_model RECIPE_PATH=../../SmartLine.API/Contracts/recipes/demobox.json VISION_REQUIRE_MQTT=false python3 main.py
-```
-
-A `.pt` file uses Ultralytics. An `.onnx` file uses Ultralytics when installed, otherwise ONNX Runtime. An OpenVINO directory or `.xml` file uses Ultralytics when installed, otherwise OpenVINO on CPU. Health is `GET http://127.0.0.1:8090/health`.
-
-## Sorting and simulation
-
-Logical destinations are `BIN_A`, `BIN_B`, `BIN_C`, `REJECT_BIN`, and `MANUAL_REVIEW`. Several products can sit in `QUEUED_FOR_SORT`. Due time uses calibration belt speed in mm/s and the inspection-to-sorter distance. The conveyor speed setpoint of 0–100 is not used as mm/s. Release records `SORTED` and does not publish a servo, motor, or fan command. `Sorting:HardwareActuationEnabled` defaults to false. Gates in a new calibration profile are stored disabled.
-
-Simulation is enabled in development and disabled in the production settings. The control room shows a SIMULATION MODE banner while the latch is set, a simulated product is in flight, or the last inspection was simulated. Clearing the latch does not relabel history. Simulator arrivals are operator-declared observations, not model measurements and not VL53L1X readings.
-
-Physical VL53L1X integration is deferred. The contracts reserve `productPresent`, `distanceMm`, `triggerTimestamp`, and `sensorHealthy`. The source remains `NOT_INTEGRATED`. A hardware trigger without the simulation flag is rejected. No physical distance is invented.
-
-## Security
-
-The Dashboard opens directly. REST API and SignalR endpoints require no login, roles, JWT, refresh cookies, device keys or service keys. All clients that can reach these HTTP endpoints can use them; MQTT certificate/password authentication and physical safety interlocks remain separate.
-
-Mosquitto rejects anonymous and plaintext clients. Clients use mutual TLS on port 8883, a local CA, a username and password, and a principal ACL. Vision may publish only `smartline/sensors/barcode`. Inspection results are HTTP so that ACL does not grow. Diagnostics omit secrets.
-
-Normal stop, emergency stop, the fire latch, and manual reset are separate. During provisioning the firmware stores a random `deviceEpoch`. Each local fire event advances a persistent `fireGeneration` inside that epoch, and each manual reset advances a monotonic `resetGeneration`. Firmware accepts reset or start only when the API acknowledges the same `(deviceEpoch, fireGeneration)` pair. The epoch, latch, and counters are one validated NVS record. A missing or corrupt record fails closed. Clearing the fire sensor does not open the latch. Reset does not start the conveyor.
-
-Servo `0°` is the safe position of this prototype. It does not remove power from a real belt motor. A hardwired emergency stop and a safety relay are outside this software.
-
-A previously leaked Wi-Fi credential must be rotated and confirmed by the owner before Git history is rewritten or republished. Until then, do not force-push or rewrite `main`.
-
-## Git artifacts
-
-Commit source, tests, recipe and calibration contracts, training config, notebooks, and model registry metadata. Do not commit `.env`, Wi-Fi credentials, private keys, generated certificates, `datasets/` images, `models/runtime/` weights, `runs/`, virtual environments, `node_modules`, or build output. `datasets/.gitkeep` and `models/runtime/.gitkeep` are the only tracked placeholders.
+Open <http://127.0.0.1:8000>. This preview uses example images and data without PostgreSQL, MQTT, a camera or a model. Writes return `409 MOCK_READ_ONLY`; production images omit the mock fixture.
 
 ## Development
 
-```bash
+```sh
 cp .env.example .env
-SMARTLINE_LAN_IP=192.168.1.20 ./infra/certs/generate-local-ca.sh
-docker compose --env-file .env -f docker-compose.dev.yml up --build
+# Set the PostgreSQL password and camera configuration in .env.
+docker compose --env-file .env -f deploy/compose.dev.yaml up --build
 ```
 
-That command leaves Vision unconfigured, so diagnostics stay `NOT_CONFIGURED` when the camera is not connected. To start PostgreSQL, MQTT, the API, the dashboard, and Vision together:
+Open <http://127.0.0.1:8000>. Development Compose runs both Python processes and PostgreSQL, with separate development database/dataset volumes. MQTT is explicitly disabled in this camera-focused stack.
 
-```bash
-docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.vision.yml --profile vision up --build
+To run the processes locally against configured infrastructure:
+
+```sh
+uv sync --frozen --extra vision
+uv run --frozen --extra vision --env-file .env smartline web
+# In another terminal, with image-process MQTT/camera variables configured:
+uv run --frozen --extra vision --env-file .env smartline vision
 ```
 
-| Service | Development address |
-| --- | --- |
-| Dashboard | `http://localhost:5173` |
-| API | `http://localhost:5047` |
-| Health | `http://localhost:5047/health` |
-| PostgreSQL | `localhost:5432` |
-| MQTT TLS | `localhost:8883` |
-| Vision control | `http://127.0.0.1:8090/health` when the vision overlay is running |
-
-The Vite dev server proxies `/api` and `/hubs`. No HTTP credentials are injected by the development server.
-
-Firmware, using the example headers and a local password that matches `.env`:
-
-```bash
-cp SmartLine.Firmware/include/Config.h.example SmartLine.Firmware/include/Config.h
-export MQTT_FIRMWARE_PASSWORD='<same-value-as-env>'
-./SmartLine.Firmware/scripts/generate-mqtt-config.sh
-cd SmartLine.Firmware
-pio run -e firmware
-pio run -e sensor-test
-```
-
-`Config.h` and `MqttTlsConfig.h` are ignored.
+Add `--extra openvino` to both dependency installation and image-process commands when using OpenVINO locally. Production image builds include ONNX Runtime and OpenVINO by default.
 
 ## Production
 
-```bash
-docker compose --env-file .env config --quiet
-docker compose --env-file .env up -d --build
-docker compose ps
+```sh
+cp .env.example .env
+# Set PostgreSQL/MQTT passwords and the camera URL before starting services.
+SMARTLINE_LAN_IP=192.168.1.20 sh deploy/certs/generate-local-ca.sh
+docker compose --env-file .env -f deploy/compose.yaml up --build -d
 ```
 
-Install `infra/certs/generated/ca.crt` as a trusted root on client devices and resolve `smartline.local` to the production host. ASP.NET Core serves the static Dashboard and API directly over HTTPS; no reverse proxy is required. See [docs/deployment.md](docs/deployment.md).
+Install `deploy/certs/generated/ca.crt` on browser clients. Open `https://smartline.local` after configuring name resolution, or use the server IP included in the certificate. Configure `ALLOWED_HOSTS` for another hostname. HTTPS terminates directly in the web process on container port 8443, mapped to host port 443; no reverse proxy is required. Mosquitto uses port 8883 with mutual TLS, passwords and topic ACLs. HTTP endpoints have no accounts, roles or device/service keys.
 
-## Testing
+Compose files and relative bind mounts live under `deploy/`; build context remains the repository root. Certificates default to `deploy/certs/generated/`. Set `SMARTLINE_CERT_DIR` to an absolute path when overriding that location. The private image-control port 8090 is not published. Its HTTPS callback uses the internal `smartline.local` alias and trusts the generated CA.
 
-```bash
-export PATH="$HOME/.dotnet:$PATH"
-export DOTNET_ROOT="$HOME/.dotnet"
-dotnet restore SmartLine.slnx
-dotnet build SmartLine.slnx --configuration Release --no-restore
-dotnet test SmartLine.API.Tests/SmartLine.API.Tests.csproj --configuration Release --no-build
+The single web worker applies migrations, seeds recipe/calibration/system defaults, reconciles dataset storage and starts MQTT before accepting requests. Database startup failure prevents startup; unavailable dataset storage is reported without disabling unrelated functionality. The image process may be unavailable while web/system stays running. Persistent volumes are `python_postgres_data`, `python_datasets` and `mosquitto_data`; earlier databases/datasets are not imported or deleted.
 
-cd SmartLine.Dashboard
-npm ci
-npm test
-npm run lint
-npm run build
+### Configuration
 
-cd ..
-python3 -m compileall -q SmartLine.Vision/src SmartLine.Training
-python3 -m unittest discover -s SmartLine.Vision/tests -p 'test_*.py'
-python3 -m unittest discover -s SmartLine.Training/tests -p 'test_*.py'
-docker compose --env-file .env config --quiet
-```
+See [.env.example](.env.example) for the common variables. Compose supplies process-specific connection and certificate values; direct commands read `.env` through `uv run --env-file .env`.
 
-GitHub Actions also builds both PlatformIO environments, checks Mosquitto TLS and ACL, and runs Gitleaks. API startup applies `InitialCreate` and `InspectionPlatform`.
-
-## Documentation
-
-| File | Contents |
+| Variable | Purpose |
 | --- | --- |
-| [docs/smart-line-api.md](docs/smart-line-api.md) | Auth, endpoints, errors, inspection API |
-| [docs/smart-line-dashboard.md](docs/smart-line-dashboard.md) | Control center and overlay |
-| [docs/smart-line-firmware.md](docs/smart-line-firmware.md) | MQTT TLS and emergency latch |
-| [docs/smart-line-vision.md](docs/smart-line-vision.md) | Event inspection and barcode MQTT |
-| [docs/smart-line-cam.md](docs/smart-line-cam.md) | GC2145 RGB565 to MJPEG |
-| [docs/deployment.md](docs/deployment.md) | Production certificates and compose |
-| [SmartLine.Training/README.md](SmartLine.Training/README.md) | Kaggle, Colab, RunPod, and model activation |
-| [docs/roadmap.md](docs/roadmap.md) | Hardening status |
+| `DATABASE_URL` or `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Web PostgreSQL connection |
+| `DATASET_ROOT` | Web-owned capture storage; local default `data/python/datasets`, Compose `/var/lib/smartline/datasets` |
+| `VISION_URL`, `VISION_CAPTURE_TIMEOUT_SECONDS` | Private image-process origin and request budget; defaults `http://127.0.0.1:8090` and 35 seconds |
+| `CAM_STREAM_URL`, `CAM_CAPTURE_URL` | Image-process MJPEG source and optional still URL; otherwise derived from the stream host |
+| `VISION_CONTROL_HOST`, `VISION_CONTROL_PORT`, `API_BASE_URL`, `RECIPE_PATH` | Private image listener (default `127.0.0.1:8090`), web callback and optional fallback recipe |
+| `STILL_CAPTURE_TIMEOUT`, `PREFER_RAW_CAPTURE`, `ALLOW_PREVIEW_FALLBACK` | Still budget 30 seconds, raw capture preferred, preview fallback disabled by default |
+| `MODEL_PATH`, `MODEL_VERSION`, `MODEL_TASK`, `MODEL_LAYOUT`, `MODEL_INPUT_SIZE`, `MODEL_CONFIDENCE` | Configured artifact and inference options |
+| `MQTT_HOST`, `MQTT_PORT`, `MQTT_CLIENT_ID`, `MQTT_USERNAME`, `MQTT_PASSWORD` | Web MQTT connection; the image process uses `MQTT_BROKER_HOST` / `MQTT_BROKER_PORT` |
+| `MQTT_CA_CERT_PATH`, `MQTT_CLIENT_CERT_PATH`, `MQTT_CLIENT_KEY_PATH` | Process-specific MQTT certificates |
+| `HTTPS_CERT_PATH`, `HTTPS_KEY_PATH`, `ALLOWED_HOSTS` | Direct web HTTPS and allowed hostnames |
+| `SMARTLINE_ENV`, `SIMULATION_ENABLED`, `HARDWARE_ACTUATION_ENABLED` | Environment, development-only simulation and existing no-actuator guard |
+| `SMARTLINE_TIME_ZONE`, `HIGH_TEMP_THRESHOLD`, `ALARM_TEMP_THRESHOLD`, `FAN_HYSTERESIS_CELSIUS` | Facility time zone and environment thresholds |
+| `SHOW_PREVIEW` | Optional local OpenCV window; disabled by default |
 
-## Known limits
+MQTT principals remain `smartline-api`, `smartline-firmware` and `smartline-vision`. Compose maps `MQTT_API_PASSWORD`, `MQTT_FIRMWARE_PASSWORD` and `MQTT_VISION_PASSWORD` to these principals. Configure each process's username/certificate/password variables when running directly; supplying only the Compose password variables does not configure a local process.
 
-- VL53L1X is not wired. Distance and product-present readings are not produced.
-- DemoBox has no trained weights. Model status stays `untrained` and metrics stay empty.
-- A trained YOLO26 artifact is still required before Vision can return boxes. The decoder is ready for `.pt`, ONNX, and OpenVINO exports. It does not download weights and does not invent boxes.
-- Vision health is `NOT_CONFIGURED` until `Vision:HealthUrl` is set, `OFFLINE` when the health request fails, and `ONLINE` only after a healthy response. The plain development command leaves the URL empty. The vision overlay sets `http://vision:8090/health` and publishes port 8090. Production sets the same internal URL and does not publish the port.
-- The barcode production chart is separate from recipe inspection yield.
-- Servo motion is not connected. Hardware actuation defaults off.
-- SSH.NET `NU1903` warnings come from the existing Testcontainers package.
+Runtime artifacts and metadata sidecars belong in `deploy/models/`, mounted read-only at `/opt/smartline/models`; set container `MODEL_PATH` accordingly and restart Vision after changing the model. Registry metadata belongs in `tools/training/registry/`; local training datasets belong in `tools/training/data/`. Training tools, dependencies, test fixtures and local artifacts are excluded from production images.
 
+```sh
+docker build -f deploy/Dockerfile --target web -t smartline-web .
+docker build -f deploy/Dockerfile --target vision -t smartline-vision .
+# Optional ONNX-only image:
+docker build -f deploy/Dockerfile --target vision --build-arg INFERENCE_BACKEND=onnx -t smartline-vision-onnx .
+```
 
-### v0.2.0 integration status
+## Dashboard
 
-See [the integration status](v0.2.0-integration-status.md) for verified behavior, remaining hardware acceptance, and the complete source-file disposition. This is a local integration candidate, not a published release. No trained model or physical sorting success is claimed.
+Django templates, native JavaScript/CSS and a local Chart.js distribution provide three sections:
 
-The API owns inspection persistence. Operators trigger `POST /api/inspections/vision` with a stable `requestId`; retries return the stored result. Manual observations remain separate. Dashboard preview is fetched through the API, so Vision is the camera's single MJPEG consumer. Stream uses port 81; capture/status use port 80.
+- **Production** (`/`): preview, last stored inspection, counters, active issues and environment readings. It sends no control or inspection commands.
+- **History** (`/history`): searchable/filterable inspection records, pagination, expandable details and production summaries. Barcode statistics remain separate from inspection yield.
+- **Management** (`/management`): conveyor controls, recipes, calibration, sensors, diagnostics, manual inspection, logical sorting, camera dataset collection and development simulators.
 
-Future scope and acceptance criteria: [deferred work](docs/v0.2.0-deferred-scope.md).
+Management subpages are directly addressable. Legacy `/inspection`, `/analytics`, `/sensors`, `/sorting`, `/recipes`, `/calibration`, `/dataset` and `/diagnostics` URLs redirect to their current locations; back/forward navigation is supported.
+
+English and dark theme are defaults. TR/EN and light/dark choices persist as `smartline.language` and `smartline.theme`; invalid/unavailable storage uses defaults. Preferences preserve form input, user text and wire values. After disconnects the last values remain visible with a warning; controls require fresh connectivity, and device controls also require MQTT and an online controller. Fire alerts remain global, with a short audible notification when allowed; resolving an alert does not reset the safety latch.
+
+Preview and stored inspection are different moments; old detection boxes are not drawn on live images. Dataset interval capture stops on navigation, hidden pages, connection failure or a missing/stopped session.
+
+## API and live events
+
+JSON responses use `isSuccess`, `message`, `data` and, on error, `code`. Fields are camelCase; unexpected exception details are hidden. Unknown/retired routes return JSON `404`, unsupported methods return `405`. Collections use bounded pagination with stable ordering. The full REST inventory is [http_contracts.json](src/smartline/web/http_contracts.json).
+
+| Area | Main paths |
+| --- | --- |
+| Monitoring and devices | `/health`, `/api/dashboard`, `/api/control-room`, `/api/diagnostics`, `/api/conveyor/*`, `/api/sensors/*` |
+| Barcode statistics, alerts and logs | `/api/products/*`, `/api/statistics/*`, `/api/alerts/*`, `/api/logs/*` |
+| Recipes and calibration | `/api/recipes/*`, `/api/calibration-profiles/*` |
+| Inspection and tracking | `/api/inspections`, `/api/inspections/{id}`, `/api/inspections/vision`, `/api/tracking/*` |
+| Datasets and simulation | `/api/dataset/sessions/*`, `/api/simulation/*` |
+
+`POST /api/inspections/vision` accepts `{"requestId":"<uuid>"}`. Web pins the recipe/calibration, requests a Vision observation, computes the decision and atomically stores the result/track. Repeating a completed ID returns the stored result without another capture. `/api/inspections` records manual observations without claiming model metadata; simulation is explicitly marked. Production inspection counters exclude simulation; yield is pass divided by pass plus reject and excludes manual review.
+
+Vision exposes private `/health`, `/frames/preview`, `/frames/dataset`, `/frames/inspection`, `/validate-recipe` and `/inspect` routes. It validates complete JPEG content, actual dimensions and the 16-million-pixel limit without recompressing valid JPEGs; barcode decoding retains MQTT publishing. Web alone writes dataset JPEGs, SHA-256 and manifests. Camera collection uses `POST /api/dataset/sessions/{id}/captures/camera`; session, discard and recovery operations coordinate writes. Missing referenced images mark `RECOVERY_REQUIRED`; legacy PNG reads remain supported. PC file upload is removed.
+
+`GET /api/events` serves ASGI SSE with `ready`, 15-second heartbeats and the seven business events: `ReceiveConveyorUpdate`, `ReceiveEnvironmentUpdate`, `ReceiveProductUpdate`, `ReceiveAlertUpdate`, `ReceiveLogUpdate`, `ReceiveInspectionUpdate` and `ReceiveTrackingUpdate`. Reconnection reloads REST snapshots. SignalR routes return `404`; diagnostics reports `signalR: "retired"` and `liveUpdates: "sse_enabled"`.
+
+## Repository and module guides
+
+```text
+src/smartline/   config, web, inspection, devices and vision packages
+firmware/       camera and controller firmware
+tests/          domain, API, image, browser and integration checks
+  support/      MQTT and deployment integration helpers
+tools/training/ offline training, registry metadata and ignored datasets
+deploy/         Docker, Compose, certificates, broker and runtime models
+```
+
+- [Camera firmware and historical hardware observations](firmware/camera/README.md)
+- [Controller setup, pins, MQTT and sensor diagnostics](firmware/controller/README.md)
+- [Dataset preparation, training and model export](tools/training/README.md)
+
+## Verification
+
+```sh
+uv sync --frozen --extra vision
+uv run --frozen --extra vision smartline manage check
+uv run --frozen --extra vision smartline manage makemigrations --check --dry-run
+uv run --frozen --extra vision ruff check src tests tools/training
+uv run --frozen --extra vision ruff format --check src tests tools/training
+# DATABASE_URL must point to disposable PostgreSQL; its user must be able to create test databases.
+uv run --frozen --extra vision --env-file .env pytest --ignore=tests/test_browser.py
+uv run --frozen playwright install chromium
+uv run --frozen pytest tests/test_browser.py
+python3 -m unittest discover -s firmware/camera/tests -p 'test_*.py'
+python3 -m unittest discover -s firmware/controller/tests -p 'test_*.py'
+# After building the production targets with these tags:
+docker build -f deploy/Dockerfile --target web -t smartline-web:ci .
+docker build -f deploy/Dockerfile --target vision -t smartline-vision:ci .
+python3 tests/support/stack/verify-compose.py
+```
+
+The Compose verifier creates disposable certificates, random ports and its own volumes, then removes only that test project. CI also runs firmware builds, MQTT mutual-TLS/topic-ACL checks and Gitleaks full-history scanning. Firmware host checks require no board; actual capture, electrical behavior, target-machine performance and factory deployment need separate hardware/environment verification.
+
+Gitleaks uses its default rules. [.github/gitleaks.ignore](.github/gitleaks.ignore) lists only two reviewed historical false positives by fingerprint; it does not exclude entire files. With Gitleaks installed locally, use the same exceptions explicitly:
+
+```sh
+gitleaks git --log-opts="--all" --redact=100 --gitleaks-ignore-path=.github/gitleaks.ignore
+```
+
+## Current limitations
+
+- Real inspection requires a configured detection model; color-only operation is not implemented. Default colors are RED/BLUE/GREEN; black/white/gray and automatic object-specific color regions remain future work.
+- Inspection uses explicit API/manual/simulator triggers; automatic product arrival, duplicate suppression across arrivals and continuous inference are not implemented.
+- Barcode products/statistics and recipe inspections/tracking remain separate. The pipeline selects one primary object; multiple-object inspection, classification and segmentation are not supported.
+- Sorting is logical. Physical actuator transport is not implemented; the production servo stays neutral. Reserved calibration rotation/flip/perspective fields do not transform images or remap boxes.
+- Model changes require a restart; automatic model replacement is not implemented. Historical inspection boxes are not overlaid on a different live frame.

@@ -1,198 +1,69 @@
-## .NET / C# Build çıktıları
-[Bb]in/
-[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
+# Python environments, generated files and tests
+.venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+staticfiles/
+test-results/
+TestResults/
+playwright-report/
+.coverage
+htmlcov/
 
-## NuGet paketleri
-*.nupkg
-**/packages/*
-*.nuget.props
-*.nuget.targets
-
-## Visual Studio / Rider dosyaları
-.vs/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.idea/
-*.DotSettings.user
-
-## VS Code
+# Editor and OS state
+.DS_Store
+Thumbs.db
+.idea/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-## Kullanıcıya özel dosyalar
-*.rsuser
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-
-## Build sonuçları
-[Dd]ebugPublic/
-[Rr]eleases/
-build/
-bld/
-*_i.c
-*_p.c
-*_h.h
-*.ilk
-*.meta
-*.obj
-*.iobj
-*.pch
-*.pdb
-*.ipdb
-*.pgc
-*.pgd
-*.rsp
-*.sbr
-*.tlb
-*.tli
-*.tlh
-*.tmp
-*.tmp_proj
-*_wpftmp.csproj
-*.log
-*.tlog
-*.vspscc
-*.vssscc
-.builds
-*.pidb
-*.svclog
-*.scc
-
-## Test sonuçları
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
-*.VisualState.xml
-TestResult.xml
-nunit-*.xml
-
-## Publish profilleri
-*.publishsettings
-PublishProfiles/
-
-## OS dosyaları
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-## Ortam değişkenleri ve gizli dosyalar
-*.env
-*.env.local
-*.env.*.local
-appsettings.*.local.json
-
-## Log dosyaları
-logs/
-*.log
-
-## Docker
-docker-compose.override.yml
-
-## Entity Framework migration geçici dosyaları
-*.jfm
-.claude/
-
-## PlatformIO build çıktıları
-.pio/
-
-## Firmware kimlik bilgileri
-SmartLine.Firmware/include/Config.h
-SmartLine.Firmware/include/MqttTlsConfig.h
-
-## Node.js / Frontend
-node_modules/
-dist/
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
-dist-ssr/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Docker gizli bilgileri
-.env
-
-# Altyapı Verileri ve Loglar (GitHub'a GİTMEMELİ)
-infra/mosquitto/data/*
-infra/mosquitto/log/*
-infra/postgres/data/*
-infra/certs/generated/*
-!infra/certs/generated/.gitkeep
-
-# Mosquitto ayar dosyası GitHub'a GİTSİN
-!infra/mosquitto/config/
-!infra/mosquitto/config/mosquitto.conf
-
-.trash/
-.venv/
-
-## C# Dev Kit cache
-*.lscache
-
-# ===== SmartLine AI local/secrets =====
+# Local configuration and credentials
 .env
 .env.*
 !.env.example
 !.env.*.example
-
 **/Config.h
 !**/Config.h.example
-
 **/MqttTlsConfig.h
 !**/MqttTlsConfig.h.example
-
 **/*.key
 **/*.p12
 **/*.pfx
+deploy/certs/generated/*
+!deploy/certs/generated/.gitkeep
+deploy/compose.override.yaml
 
-infra/certs/generated/
-
-# Build/dependencies
+# Runtime data, logs and build artifacts
+data/python/
+deploy/mosquitto/data/*
+deploy/mosquitto/log/*
+deploy/postgres/data/*
+logs/
+*.log
 **/.pio/
-**/node_modules/
-**/.venv/
-**/__pycache__/
-**/.pytest_cache/
-**/dist/
-SmartLine.API/wwwroot/
-**/build/
+node_modules/
+.trash/
 
-# AI datasets / trained artifacts
+# Dataset and model artifacts
 data/raw/
 data/processed/
-datasets/*
-!datasets/.gitkeep
+tools/training/data/*
+!tools/training/data/.gitkeep
 runs/
 weights/
-models/checkpoints/
-models/runtime/*
-!models/runtime/.gitkeep
-
+tools/training/checkpoints/
+deploy/models/*
+!deploy/models/.gitkeep
 *.pt
 *.pth
 *.onnx
 *.engine
 *.tflite
-
-# OS/editor
-.DS_Store
-Thumbs.db

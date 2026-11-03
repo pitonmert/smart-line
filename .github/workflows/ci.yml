@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, "integration/**"]
+    branches: [main, "integration/**", "refactor/**"]
   workflow_dispatch:
 
 permissions:
@@ -14,85 +14,86 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dotnet:
-    name: .NET build and integration tests
+  python:
+    name: Python application and PostgreSQL integration
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: smartline_python
+          POSTGRES_USER: smartline
+          POSTGRES_PASSWORD: ci-test-only
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U smartline -d smartline_python"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://smartline:ci-test-only@127.0.0.1:5432/smartline_python
+      MQTT_ENABLED: "false"
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Set up Python for API–Vision integration
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install API–Vision test dependencies
-        run: python -m pip install numpy Pillow==12.3.0
-
-      - name: Restore solution
-        run: dotnet restore SmartLine.slnx
-
-      - name: Build solution
-        run: dotnet build SmartLine.slnx --configuration Release --no-restore
-
-      - name: Run PostgreSQL integration tests
-        run: >-
-          dotnet test SmartLine.API.Tests/SmartLine.API.Tests.csproj
-          --configuration Release
-          --no-build
-          --logger "trx;LogFileName=smartline-api-tests.trx"
-          --results-directory TestResults
-
+      - name: Install uv and native image libraries
+        run: |
+          python -m pip install uv==0.13.6
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0 libzbar0
+      - name: Install locked dependencies
+        run: uv sync --frozen --extra vision
+      - name: Validate application and formatting
+        run: |
+          uv run --frozen --extra vision smartline manage check
+          uv run --frozen --extra vision smartline manage makemigrations --check --dry-run
+          uv run --frozen --extra vision ruff check src tests tools/training
+          uv run --frozen --extra vision ruff format --check src tests tools/training
+      - name: Run domain, API, Vision, training and process tests
+        run: uv run --frozen --extra vision pytest --ignore=tests/test_browser.py --junitxml=test-results/python.xml
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dotnet-test-results
-          path: TestResults
+          name: python-test-results
+          path: test-results
           if-no-files-found: ignore
-          retention-days: 7
 
   dashboard:
-    name: Dashboard lint, build, and browser tests
+    name: Django Dashboard browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.13.6
+      - run: uv sync --frozen
+      - run: uv run --frozen playwright install --with-deps chromium
+      - run: uv run --frozen pytest tests/test_browser.py --junitxml=test-results/browser.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-test-results
+          path: test-results
+          if-no-files-found: ignore
+
+  containers:
+    name: Production images and package boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: SmartLine.Dashboard
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: SmartLine.Dashboard/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint dashboard
-        run: npm run lint
-
-      - name: Test dashboard overlay geometry
-        run: npm test
-
-      - name: Build dashboard
-        run: npm run build
-
-      - name: Install the Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: Run browser end-to-end tests
-        run: npm run e2e
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/Dockerfile --target web --tag smartline-web:ci .
+      - run: docker build -f deploy/Dockerfile --target vision --tag smartline-vision:ci .
+      - name: Verify production package boundaries
+        run: |
+          docker run --rm --entrypoint python smartline-web:ci -c "import importlib.util; assert importlib.util.find_spec('ultralytics') is None; assert importlib.util.find_spec('pytest') is None; assert importlib.util.find_spec('cv2') is None"
+          docker run --rm --entrypoint python smartline-vision:ci -c "import smartline.vision.inference; import importlib.util; assert importlib.util.find_spec('ultralytics') is None; assert importlib.util.find_spec('pytest') is None"
+      - name: Verify isolated Compose startup and HTTPS
+        run: python3 tests/support/stack/verify-compose.py
 
   firmware:
     name: Firmware PlatformIO builds
@@ -112,18 +113,20 @@ jobs:
         run: python -m pip install platformio==6.1.19
 
       - name: Run firmware host regression tests
-        run: python -m unittest discover -s SmartLine.Firmware/tests -p 'test_*.py' -v
+        run: |
+          python -m unittest discover -s firmware/controller/tests -p 'test_*.py' -v
+          python -m unittest discover -s firmware/camera/tests -p 'test_*.py' -v
 
       - name: Prepare non-secret CI firmware configuration
         run: |
-          cp SmartLine.Firmware/include/Config.h.example SmartLine.Firmware/include/Config.h
-          cp SmartLine.Firmware/include/MqttTlsConfig.h.example SmartLine.Firmware/include/MqttTlsConfig.h
+          cp firmware/controller/include/Config.h.example firmware/controller/include/Config.h
+          cp firmware/controller/include/MqttTlsConfig.h.example firmware/controller/include/MqttTlsConfig.h
 
       - name: Build firmware environment
-        run: pio run --project-dir SmartLine.Firmware --environment firmware
+        run: pio run --project-dir firmware/controller --environment firmware
 
       - name: Build sensor-test environment
-        run: pio run --project-dir SmartLine.Firmware --environment sensor-test
+        run: pio run --project-dir firmware/controller --environment sensor-test
 
       - name: Build ESP32-CAM environment
         env:
@@ -132,7 +135,7 @@ jobs:
           WIFI_STATIC_IP: 192.168.1.50
           WIFI_GATEWAY: 192.168.1.1
           WIFI_SUBNET: 255.255.255.0
-        run: pio run --project-dir SmartLine.Cam --environment esp32cam
+        run: pio run --project-dir firmware/camera --environment esp32cam
 
   mqtt-security:
     name: Mosquitto TLS and ACL integration
@@ -156,46 +159,63 @@ jobs:
       - name: Generate disposable CI certificates
         env:
           SMARTLINE_LAN_IP: 127.0.0.1
-        run: sh infra/certs/generate-local-ca.sh
+        run: sh deploy/certs/generate-local-ca.sh
 
       - name: Generate an untrusted test client certificate
-        run: sh test-support/mqtt/generate-untrusted-client.sh
+        run: sh tests/support/mqtt/generate-untrusted-client.sh
 
       - name: Validate MQTT integration compose configuration
         run: >-
           docker compose
-          -f docker-compose.yml
-          -f test-support/mqtt/docker-compose.mtls-test.yml
+          -f deploy/compose.yaml
+          -f tests/support/mqtt/docker-compose.mtls-test.yml
           config --quiet
 
       - name: Start isolated Mosquitto broker
         run: >-
           docker compose
-          -f docker-compose.yml
-          -f test-support/mqtt/docker-compose.mtls-test.yml
+          -f deploy/compose.yaml
+          -f tests/support/mqtt/docker-compose.mtls-test.yml
           up --detach --wait --wait-timeout 60 mosquitto
 
       - name: Verify mutual TLS authentication and topic ACLs
         run: >-
           docker compose
-          -f docker-compose.yml
-          -f test-support/mqtt/docker-compose.mtls-test.yml
+          -f deploy/compose.yaml
+          -f tests/support/mqtt/docker-compose.mtls-test.yml
           run --rm --no-deps mqtt-test-client
+
+      - name: Build the Python MQTT runtime test client
+        run: docker build -f deploy/Dockerfile --target web --tag smartline-web:mqtt-test .
+
+      - name: Verify Python message delivery and reconnect
+        env:
+          MQTT_PASSWORD: ${{ env.MQTT_API_PASSWORD }}
+        run: >-
+          docker run --rm --network smartline_backend --entrypoint python
+          -v "$SMARTLINE_CERT_DIR:/test-certs:ro"
+          -v "$PWD/tests/support/mqtt_runtime.py:/test/mqtt_runtime.py:ro"
+          -e MQTT_HOST=mosquitto -e MQTT_TEST_CERT_DIR=/test-certs
+          -e MQTT_CA_CERT_PATH=/test-certs/ca.crt
+          -e MQTT_CLIENT_CERT_PATH=/test-certs/smartline-api.crt
+          -e MQTT_CLIENT_KEY_PATH=/test-certs/smartline-api.key
+          -e MQTT_USERNAME=smartline-api -e MQTT_PASSWORD -e MQTT_FIRMWARE_PASSWORD
+          smartline-web:mqtt-test /test/mqtt_runtime.py
 
       - name: Show broker logs after failure
         if: failure()
         run: >-
           docker compose
-          -f docker-compose.yml
-          -f test-support/mqtt/docker-compose.mtls-test.yml
+          -f deploy/compose.yaml
+          -f tests/support/mqtt/docker-compose.mtls-test.yml
           logs mosquitto
 
       - name: Stop broker
         if: always()
         run: >-
           docker compose
-          -f docker-compose.yml
-          -f test-support/mqtt/docker-compose.mtls-test.yml
+          -f deploy/compose.yaml
+          -f tests/support/mqtt/docker-compose.mtls-test.yml
           down --volumes
 
       - name: Remove disposable MQTT certificates
@@ -204,31 +224,6 @@ jobs:
           rm -rf
           /tmp/smartline-mqtt-trusted-certs
           /tmp/smartline-mqtt-test-certs
-
-  vision:
-    name: Vision Python syntax checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install image test dependencies
-        run: python -m pip install numpy Pillow==12.3.0
-
-      - name: Compile Vision, camera smoke, and training modules
-        run: python -m compileall -q SmartLine.Vision/src SmartLine.Cam/scripts SmartLine.Cam/tests SmartLine.Training
-
-      - name: Run Vision, camera smoke, and training unit tests
-        run: |
-          python -m unittest discover -s SmartLine.Vision/tests -p 'test_*.py'
-          python -m unittest discover -s SmartLine.Cam/tests -p 'test_*.py'
-          python -m unittest discover -s SmartLine.Training/tests -p 'test_*.py'
 
   secrets:
     name: Gitleaks full repository scan
@@ -241,7 +236,24 @@ jobs:
           fetch-depth: 0
 
       - name: Scan the repository and history
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: "false"
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          docker run --rm \
+            -v "$PWD:/repo:ro" \
+            -v "$RUNNER_TEMP/gitleaks:/results" \
+            -w /repo \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git /repo --log-opts=--all --redact=100 \
+            --gitleaks-ignore-path=/repo/.github/gitleaks.ignore \
+            --report-format=sarif --report-path=/results/gitleaks.sarif
+
+      - name: Upload secret scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-results
+          path: ${{ runner.temp }}/gitleaks/gitleaks.sarif
+          if-no-files-found: ignore

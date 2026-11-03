@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "smartline"
+version = "0.2.0"
+description = "Factory monitoring, inspection, and device control"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "Django==5.2.18",
+  "uvicorn>=0.38,<1",
+  "psycopg[binary]>=3.2,<4",
+  "paho-mqtt==2.1.0",
+]
+
+[project.optional-dependencies]
+vision = [
+  "numpy>=1.26,<3",
+  "opencv-python==4.10.0.84",
+  "pyzbar==0.1.9",
+  "onnxruntime==1.22.1",
+  "Pillow==12.3.0",
+]
+openvino = ["openvino==2026.4.1"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<10",
+  "pytest-django>=4.9,<5",
+  "pytest-asyncio>=1,<2",
+  "playwright>=1.55,<2",
+  "ruff>=0.14,<1",
+  "numpy>=1.26,<3",
+  "Pillow==12.3.0",
+]
+training = [
+  "ultralytics==8.4.173",
+  "pyyaml==6.0.2",
+  "onnx==1.17.0",
+  "onnxruntime==1.22.1",
+  "openvino==2026.4.1",
+  "Pillow==12.3.0",
+]
+
+[project.scripts]
+smartline = "smartline.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/smartline"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "smartline.config.settings"
+pythonpath = ["src", "tools/training", "tests/vision"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["browser: browser interaction tests", "integration: isolated process or broker integration"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

@@ -1,0 +1,689 @@
+{
+  "baseline": "003eb27",
+  "apiTests": {
+    "SmartLine.API.Tests/Contracts/ErrorContractTests.cs": [
+      "Missing_product_returns_stable_not_found_code",
+      "Invalid_product_color_returns_stable_code",
+      "Invalid_product_status_returns_stable_code",
+      "Whitespace_padded_barcode_is_rejected_as_duplicate_before_insert",
+      "Structurally_invalid_request_returns_request_invalid_code",
+      "Non_numeric_speed_returns_request_invalid_code",
+      "Speed_change_while_running_returns_domain_code",
+      "Speed_change_without_speed_field_is_rejected_instead_of_defaulting_to_zero",
+      "Numeric_enum_values_are_rejected_in_product_bodies",
+      "Numeric_enum_values_are_rejected_in_paths",
+      "Numeric_color_is_rejected_in_device_barcode_payload",
+      "Unexpected_exception_is_hidden_behind_the_500_error_contract"
+    ],
+    "SmartLine.API.Tests/Contracts/PublicAccessTests.cs": [
+      "ReadsDoNotRequireCredentials",
+      "SensorWritesAndConveyorControlDoNotRequireCredentials",
+      "RetiredIdentityEndpointsReturnNotFound",
+      "SignalRConnectsWithoutAToken"
+    ],
+    "SmartLine.API.Tests/Contracts/PaginationContractTests.cs": [
+      "Product_pagination_normalizes_page_and_caps_page_size_at_one_hundred",
+      "Product_pagination_returns_a_deterministic_second_page",
+      "Filtered_product_collections_use_the_same_page_contract",
+      "Every_filtered_collection_has_a_bounded_default_page",
+      "Every_filtered_collection_returns_a_correct_second_page",
+      "Every_filtered_collection_normalizes_page_and_caps_page_size",
+      "Collection_order_is_stable_when_timestamps_are_equal"
+    ],
+    "SmartLine.API.Tests/Safety/FireTests.cs": [
+      "Repeated_fire_signal_is_idempotent_and_keeps_the_conveyor_emergency_stopped",
+      "Fire_clear_then_admin_reset_requires_an_explicit_start",
+      "Offline_fire_generation_requires_a_new_admin_reset_that_acknowledges_it",
+      "First_device_epoch_commissions_fail_safe_until_admin_acknowledges_it",
+      "New_epoch_after_nvs_erase_relatches_even_when_sensor_is_clear",
+      "Same_epoch_generation_rollback_faults_closed_and_blocks_reset_and_start",
+      "Replayed_fire_identity_after_clear_relatches_without_duplicate_audit",
+      "Invalid_device_epoch_is_rejected",
+      "Missing_fire_generation_is_rejected_instead_of_defaulting_to_zero",
+      "Missing_device_epoch_is_rejected",
+      "Missing_is_detected_is_rejected"
+    ],
+    "SmartLine.API.Tests/Safety/EnvironmentTests.cs": [
+      "High_temperature_updates_status_activates_fan_and_creates_alert",
+      "Mqtt_failure_returns_503_after_committed_environment_state_and_audit",
+      "Fan_hysteresis_turns_on_above_the_upper_bound_and_off_below_the_lower_bound",
+      "Persistence_failure_rolls_back_the_high_temperature_use_case"
+    ],
+    "SmartLine.API.Tests/Inspection/VisionGatewayTests.cs": [
+      "FrameUrlUsesTheVisionControlRoot",
+      "PublicUrlDropsCredentials",
+      "ServiceStatusIsOnlineOnlyAfterAHealthyResponse",
+      "ProbeDoesNotClaimOnlineWhenThePortIsClosed",
+      "ProbeReportsOnlineFromARealHealthResponse",
+      "CaptureClientRejectsAMissingHealthUrl",
+      "LegacyCorrectionTouchesOnlyTheUntouchedSeed",
+      "ProbeReadsStillMetadataWithoutReplacingThePreviewSize",
+      "CaptureClientKeepsTheMeasuredStillAndRejectsAFailedStill",
+      "OlderInspectionAndDatasetRowsKeepTheirDefaults",
+      "CaptureTimeoutAndUnreachableServiceHaveControlledResponses"
+    ],
+    "SmartLine.API.Tests/Inspection/RecipeValidatorTests.cs": [
+      "UndefinedRuleReferencesAreRejected",
+      "UndefinedExpectedColorIsRejected",
+      "OptionalAndWildcardRuleConditionsRemainValid",
+      "UnknownObservationCodesCanBeTargetedByRules",
+      "TrailingNewlineIsNotAValidCode",
+      "RecipeNeedsAManualReviewDestination"
+    ],
+    "SmartLine.API.Tests/Inspection/TrackingAndSortingTests.cs": [
+      "ProductMovesThroughTheHappyPath",
+      "IllegalAndTerminalTransitionsFail",
+      "ManualReviewCanReturnToDecided",
+      "SortDelayUsesBeltSpeedAndDistance",
+      "QueueReleasesTheEarliestDueProductFirst",
+      "ActuatorGuardNeverIssuesAHardwareCommand",
+      "YieldIgnoresAnEmptyDecidedPopulation"
+    ],
+    "SmartLine.API.Tests/Inspection/DatasetRegressionTests.cs": [
+      "UnknownLabelsAndMissingIntervalAreRejected",
+      "ConcurrentStartCreatesOnlyOneSessionAndDiskUploadIsNotFound",
+      "ExistingPngImageRemainsReadable",
+      "MissingImageRequiresRecoveryWithoutBlockingOtherApiFunctions",
+      "DatabaseFailureRemovesNewImageAndManifest"
+    ],
+    "SmartLine.API.Tests/Inspection/ApiVisionIntegrationTests.cs": [
+      "ActualVisionHttpServerPersistsOneResultForRetriedRequest"
+    ],
+    "SmartLine.API.Tests/Inspection/DecisionEngineTests.cs": [
+      "DemoBoxRecipeIsValid",
+      "SharedFixturesMatchTheEngine",
+      "RejectsConfidenceOutsideTheUnitInterval",
+      "OverlappingSizeClassesAreRejected",
+      "UnknownDestinationIsRejected",
+      "InvalidMeasuredDimensionsAreRejected",
+      "ExplicitNullSectionsAreValidationErrors",
+      "NullEntriesAndRuleConditionsAreValidationErrors",
+      "NonFiniteRecipeValuesAreValidationErrors",
+      "RecipeAndDecisionRoundTripWithoutRuntimeServices",
+      "PhysicalConfidenceFloorDoesNotWeakenAcceptance",
+      "CatchAllPassRuleCannotOverrideAcceptance",
+      "UnsafeDefaultFallsBackToManualReview",
+      "LowConfidenceCannotBeSentToRejectByACatchAllRule",
+      "CompatibleRulesRetainTheirDestination",
+      "MissingSafeDestinationFailsInsteadOfPassing"
+    ],
+    "SmartLine.API.Tests/Inspection/InspectionPlatformTests.cs": [
+      "RecipesAreAvailableWithoutAuthentication",
+      "DemoBoxIsSeededAndInvalidRecipesAreRejected",
+      "SimulationArrivalIsMarkedAndDoesNotCommandActuators",
+      "DeviceCanSubmitARealInspectionWithoutAFakeSensorReading",
+      "ActiveRecipeSnapshotIsAvailableWithoutDeviceKey",
+      "CalibrationRejectsHardwareTimeOfFlightAndEnabledGates",
+      "DatasetCaptureStoresAnUnannotatedImage",
+      "CameraCaptureStoresOneFrameAndCanDiscardIt",
+      "CameraCaptureWithoutVisionIsRejected",
+      "StillFailureDoesNotStoreADatasetImage",
+      "UntouchedLegacyDemoBoxCameraProfileIsCorrected",
+      "CustomizedDemoBoxKeepsItsCameraProfile",
+      "DiagnosticsDoesNotExposeSecrets"
+    ],
+    "SmartLine.API.Tests/Inspection/TrackingAndSortingRegressionTests.cs": [
+      "NonFiniteDistanceIsRejected",
+      "InvalidSpeedLeavesTimingUnknown",
+      "OverflowingDelayIsRejected",
+      "InvalidDelayCannotProduceADueDate",
+      "TimingSupportsExactBoundsZeroAndMissingValues",
+      "LargeProductionCountsDoNotOverflow",
+      "NegativeProductionCountsAreRejected",
+      "BackwardsTransitionDoesNotMutateTheTrack",
+      "ReturningFromManualReviewClearsTheReasonAndUpdatesDecisionTime",
+      "QueueIncludesExactDueTimeAndKeepsUnknownTimesPending"
+    ],
+    "SmartLine.API.Tests/Inspection/InspectionPersistenceTests.cs": [
+      "ConcurrentActivationLeavesExactlyOneActiveRecipe",
+      "FailedActivationRollsBackPreviousActiveRecipe",
+      "InspectionRetainsTheExplicitRecipeCalibrationIdentity",
+      "StaleRecipeVersionDoesNotCreateRecords"
+    ],
+    "SmartLine.API.Tests/Inspection/CalibrationAndResultTests.cs": [
+      "UncalibratedProfileIsSafe",
+      "NonFiniteCalibrationIsRejected",
+      "ExplicitNullAndNullItemsAreRejected",
+      "HardwareCannotBeEnabledEvenWithConfirmation",
+      "ResultDoesNotInventModelMetadata"
+    ],
+    "SmartLine.API.Tests/Production/BarcodeTests.cs": [
+      "Duplicate_barcode_returns_conflict_and_does_not_increment_statistics_twice",
+      "Concurrent_duplicate_barcode_allows_exactly_one_product",
+      "Comma_separated_color_value_is_rejected_instead_of_matching_a_flag_combination",
+      "Empty_barcode_creates_a_no_barcode_product_and_alert_atomically"
+    ],
+    "SmartLine.API.Tests/Hosting/DashboardHostingTests.cs": [
+      "DashboardAssetsAndApiAreAvailableWithoutAuthentication"
+    ],
+    "SmartLine.API.Tests/Conveyor/EmergencyStopTests.cs": [
+      "Normal_stop_does_not_set_the_emergency_latch",
+      "Emergency_stop_latches_state_and_uses_the_dedicated_mqtt_command",
+      "Start_is_rejected_while_emergency_stop_is_latched",
+      "Emergency_reset_does_not_require_an_account",
+      "Emergency_reset_is_blocked_while_fire_sensor_is_active",
+      "Admin_can_reset_after_fire_sensor_clears_without_starting_the_conveyor",
+      "Mqtt_failure_returns_a_stable_service_unavailable_error",
+      "Every_admin_reset_advances_the_monotonic_reset_generation"
+    ],
+    "SmartLine.API.Tests/Conveyor/ConveyorConcurrencyTests.cs": [
+      "Concurrent_start_and_emergency_requests_leave_mqtt_and_database_safe",
+      "Concurrent_fire_messages_create_one_transition_audit",
+      "Emergency_preempts_an_in_flight_start_publish",
+      "Client_cancellation_cannot_abort_an_authorized_emergency_transition"
+    ],
+    "SmartLine.API.Tests/Monitoring/StatisticsTests.cs": [
+      "Barcode_ingestion_updates_daily_and_hourly_statistics_once",
+      "Daily_statistics_reject_a_range_longer_than_366_days",
+      "Daily_statistics_exclude_hourly_rows",
+      "Concurrent_ingestion_keeps_one_daily_and_one_hourly_row"
+    ]
+  },
+  "events": [
+    "ReceiveAlertUpdate",
+    "ReceiveConveyorUpdate",
+    "ReceiveEnvironmentUpdate",
+    "ReceiveInspectionUpdate",
+    "ReceiveLogUpdate",
+    "ReceiveProductUpdate",
+    "ReceiveTrackingUpdate"
+  ],
+  "http": [
+    {
+      "path": "/api/alerts",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/alerts/active",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/alerts/type/{type}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/alerts/{id:int}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/alerts/{id:int}/resolve",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/calibration-profiles",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/calibration-profiles/active",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/calibration-profiles/{id:guid}",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "path": "/api/calibration-profiles/{id:guid}/activate",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/camera/preview",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/control-room",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/conveyor/emergency-reset",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/conveyor/emergency-stop",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/conveyor/speed",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/conveyor/start",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/conveyor/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/conveyor/stop",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/dashboard",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/active",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/{id:guid}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/{id:guid}/captures/camera",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/{id:guid}/images/{fileName}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/{id:guid}/samples/{sampleId:guid}",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/api/dataset/sessions/{id:guid}/stop",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/diagnostics",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/inspections",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/inspections/vision",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/inspections/{id:guid}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/logs",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/logs/event/{eventType}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/logs/severity/{level}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/products",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/products/barcode/{barcode}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/products/color/{color}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/products/defective",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/products/status/{status}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/products/{id:int}",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/recipes",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/recipes/active",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/recipes/active/snapshot",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/recipes/{id:guid}",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "path": "/api/recipes/{id:guid}/activate",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/sensors/barcode",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/sensors/environment",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/sensors/fire",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/sensors/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/simulation/arrivals",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/simulation/clear",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/simulation/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/simulation/tick",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/statistics/daily",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/statistics/hourly",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/tracking",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/tracking/queue",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/tracking/{id:guid}/release",
+      "methods": [
+        "POST"
+      ]
+    }
+  ],
+  "scenarioMapping": {
+    "SmartLine.API.Tests/Contracts/ErrorContractTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_malformed_json",
+        "tests/test_api.py::test_invalid_products",
+        "tests/test_contract_regressions.py::test_error_contracts_hide_unexpected_exceptions_and_reject_padded_duplicates"
+      ]
+    },
+    "SmartLine.API.Tests/Contracts/PublicAccessTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_public_reads",
+        "tests/test_api.py::test_retired_routes_remain_json_404",
+        "tests/test_process_integration.py::test_sse_event_names_and_payloads"
+      ]
+    },
+    "SmartLine.API.Tests/Contracts/PaginationContractTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_products_pagination_duplicate_and_filters",
+        "tests/test_contract_regressions.py::test_filtered_collection_pages_have_stable_order_and_bounds"
+      ]
+    },
+    "SmartLine.API.Tests/Safety/FireTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_emergency_fire_generations_and_resets",
+        "tests/test_api.py::test_invalid_fire_protocol",
+        "tests/test_api.py::test_concurrent_fire_only_audits_one_transition"
+      ]
+    },
+    "SmartLine.API.Tests/Safety/EnvironmentTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_environment_thresholds",
+        "tests/test_api.py::test_environment_hysteresis_alert_failure_commits",
+        "tests/test_contract_regressions.py::test_environment_database_failure_leaves_state_and_audits_unchanged"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/VisionGatewayTests.cs": {
+      "targets": [
+        "tests/test_contract_regressions.py::test_vision_transport_failure_codes",
+        "tests/test_contract_regressions.py::test_vision_frame_metadata_keeps_still_dimensions_and_rejects_bad_bytes",
+        "tests/test_process_integration.py::test_two_process_inspection_retry_dataset_and_live_events",
+        "tests/vision/"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/RecipeValidatorTests.cs": {
+      "targets": [
+        "tests/test_domain.py::test_undefined_rule_references",
+        "tests/test_domain.py::test_code_newline_rejected",
+        "tests/test_domain.py::test_wildcard_conditions",
+        "tests/test_domain.py::test_missing_safe_destination_and_unknown_references"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/TrackingAndSortingTests.cs": {
+      "targets": [
+        "tests/test_domain.py::test_tracking_transition_matrix",
+        "tests/test_domain.py::test_tracking_time_and_manual_review",
+        "tests/test_domain.py::test_production_yield",
+        "tests/test_api.py::test_manual_inspection_source_and_simulation_counters"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/DatasetRegressionTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_invalid_dataset_labels_and_mode",
+        "tests/test_api.py::test_concurrent_dataset_start_and_barcode",
+        "tests/test_api.py::test_dataset_capture_discard_png_and_stop",
+        "tests/test_api.py::test_dataset_failed_database_write_rolls_back_files",
+        "tests/test_api.py::test_dataset_restart_recovery",
+        "tests/test_api.py::test_partial_image_failure_restores_previous_manifest"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/ApiVisionIntegrationTests.cs": {
+      "targets": [
+        "tests/test_process_integration.py::test_two_process_inspection_retry_dataset_and_live_events"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/DecisionEngineTests.cs": {
+      "targets": [
+        "tests/test_domain.py"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/InspectionPlatformTests.cs": {
+      "targets": [
+        "tests/test_api.py",
+        "tests/test_process_integration.py::test_two_process_inspection_retry_dataset_and_live_events"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/TrackingAndSortingRegressionTests.cs": {
+      "targets": [
+        "tests/test_domain.py::test_invalid_sort_distance",
+        "tests/test_domain.py::test_unknown_sort_speed",
+        "tests/test_domain.py::test_invalid_due_time",
+        "tests/test_domain.py::test_negative_counts",
+        "tests/test_domain.py::test_tracking_time_and_manual_review",
+        "tests/test_api.py::test_manual_inspection_source_and_simulation_counters"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/InspectionPersistenceTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_concurrent_recipe_activation",
+        "tests/test_api.py::test_vision_rejects_changed_snapshot",
+        "tests/test_contract_regressions.py::test_failed_activation_retains_previous_recipe",
+        "tests/test_contract_regressions.py::test_inspection_uses_recipe_explicit_calibration_identity"
+      ]
+    },
+    "SmartLine.API.Tests/Inspection/CalibrationAndResultTests.cs": {
+      "targets": [
+        "tests/test_domain.py::test_default_contracts_and_json_roundtrip",
+        "tests/test_domain.py::test_non_finite_calibration",
+        "tests/test_domain.py::test_calibration_rejects_unsupported_data",
+        "tests/test_api.py::test_manual_inspection_source_and_simulation_counters"
+      ]
+    },
+    "SmartLine.API.Tests/Production/BarcodeTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_barcode_atomicity_and_statistics",
+        "tests/test_api.py::test_concurrent_dataset_start_and_barcode",
+        "tests/test_contract_regressions.py::test_error_contracts_hide_unexpected_exceptions_and_reject_padded_duplicates"
+      ]
+    },
+    "SmartLine.API.Tests/Hosting/DashboardHostingTests.cs": {
+      "targets": [
+        "tests/test_browser.py::test_routes",
+        "tests/test_browser.py::test_legacy_routes_and_browser_history",
+        "tests/test_browser.py::test_mock_has_no_external_requests"
+      ]
+    },
+    "SmartLine.API.Tests/Conveyor/EmergencyStopTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_conveyor_controls_and_mqtt_failure",
+        "tests/test_api.py::test_emergency_fire_generations_and_resets",
+        "tests/test_api.py::test_emergency_persists_even_if_mqtt_is_down"
+      ]
+    },
+    "SmartLine.API.Tests/Conveyor/ConveyorConcurrencyTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_concurrent_emergency_preempts_start_and_reconnect_republishes",
+        "tests/test_api.py::test_concurrent_fire_only_audits_one_transition",
+        "tests/test_process_integration.py::test_client_cancellation_does_not_abort_an_authorized_emergency"
+      ]
+    },
+    "SmartLine.API.Tests/Monitoring/StatisticsTests.cs": {
+      "targets": [
+        "tests/test_api.py::test_barcode_atomicity_and_statistics",
+        "tests/test_api.py::test_concurrent_dataset_start_and_barcode",
+        "tests/test_contract_regressions.py::test_statistics_date_bounds_and_daily_hourly_separation"
+      ]
+    }
+  },
+  "intentionalReplacements": {
+    "SignalRConnectsWithoutAToken": "Native SSE event names/payloads and real streaming connection are covered by test_process_integration.py. SignalR routes intentionally return 404.",
+    "LegacyCorrectionTouchesOnlyTheUntouchedSeed": "Not applicable to the approved fresh Django database. No legacy database import or seed-repair migration runs.",
+    "UntouchedLegacyDemoBoxCameraProfileIsCorrected": "Not applicable to clean cutover; the current corrected contract is seeded directly.",
+    "CustomizedDemoBoxKeepsItsCameraProfile": "No legacy records are imported or mutated; pre-existing databases remain untouched.",
+    "OlderInspectionAndDatasetRowsKeepTheirDefaults": "No old database rows are imported; new model defaults and legacy PNG reads are covered in test_api.py."
+  }
+}

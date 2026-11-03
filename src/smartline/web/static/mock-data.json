@@ -1,0 +1,899 @@
+{
+  "recipe": {
+    "id": "mock-recipe",
+    "name": "DemoBox",
+    "description": "Example recipe for the mock preview.",
+    "version": 1,
+    "isActive": true,
+    "updatedAt": "2026-11-02T17:51:01.286Z",
+    "definition": {
+      "name": "DemoBox",
+      "productClasses": [
+        {
+          "code": "BOX_RED",
+          "displayName": "RED box",
+          "expectedColor": "RED"
+        },
+        {
+          "code": "BOX_BLUE",
+          "displayName": "BLUE box",
+          "expectedColor": "BLUE"
+        },
+        {
+          "code": "BOX_GREEN",
+          "displayName": "GREEN box",
+          "expectedColor": "GREEN"
+        }
+      ],
+      "allowedColors": [
+        {
+          "code": "RED",
+          "displayName": "Red",
+          "hueMin": 345,
+          "hueMax": 15
+        },
+        {
+          "code": "BLUE",
+          "displayName": "Blue",
+          "hueMin": 190,
+          "hueMax": 250
+        },
+        {
+          "code": "GREEN",
+          "displayName": "Green",
+          "hueMin": 80,
+          "hueMax": 160
+        }
+      ],
+      "sizeClasses": [
+        {
+          "code": "SMALL",
+          "displayName": "Small",
+          "minWidthMm": 0,
+          "maxWidthMm": 40
+        },
+        {
+          "code": "MEDIUM",
+          "displayName": "Medium",
+          "minWidthMm": 40,
+          "maxWidthMm": 80
+        },
+        {
+          "code": "LARGE",
+          "displayName": "Large",
+          "minWidthMm": 80,
+          "maxWidthMm": 200
+        }
+      ],
+      "defectClasses": [
+        {
+          "code": "DAMAGED",
+          "displayName": "Damaged",
+          "rejects": true
+        }
+      ],
+      "acceptance": {
+        "minimumConfidence": 0.8,
+        "defaultDestinationBin": "MANUAL_REVIEW"
+      },
+      "sortingRules": [
+        {
+          "id": "damaged",
+          "priority": 1,
+          "destinationBin": "REJECT_BIN",
+          "when": {
+            "defectClass": "DAMAGED"
+          }
+        }
+      ],
+      "destinationBins": [
+        {
+          "code": "BIN_A",
+          "displayName": "Accepted",
+          "role": "PASS"
+        },
+        {
+          "code": "REJECT_BIN",
+          "displayName": "Rejected",
+          "role": "REJECT"
+        },
+        {
+          "code": "MANUAL_REVIEW",
+          "displayName": "Manual review",
+          "role": "HOLD"
+        }
+      ],
+      "model": {
+        "task": "detect",
+        "family": "YOLO26",
+        "name": "demo-model",
+        "version": "mock",
+        "inputSize": 640
+      },
+      "cameraProfile": {
+        "streamUrl": "/api/camera/preview",
+        "sourceWidth": 640,
+        "sourceHeight": 480,
+        "sensor": "MOCK",
+        "pixelFormat": "RGB",
+        "transport": "MOCK"
+      },
+      "roi": {
+        "x": 0.1,
+        "y": 0.15,
+        "width": 0.8,
+        "height": 0.7
+      },
+      "inspection": {
+        "continuousInference": false,
+        "triggerModes": ["manual"],
+        "selectionStrategy": "latest"
+      }
+    }
+  },
+  "inspections": [
+    {
+      "inspectionId": "mock-inspection-0",
+      "productId": "mock-product-0",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:51:01.286Z",
+      "processedAt": "2026-11-02T17:51:01.286Z",
+      "productClass": "BOX_RED",
+      "colorClass": "RED",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_RED",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-1",
+      "productId": "mock-product-1",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:50:01.286Z",
+      "processedAt": "2026-11-02T17:50:01.286Z",
+      "productClass": "BOX_BLUE",
+      "colorClass": "BLUE",
+      "sizeClass": "MEDIUM",
+      "defectClasses": ["DAMAGED"],
+      "qualityStatus": "DEFECTIVE",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_BLUE",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "REJECT",
+      "destinationBin": "REJECT_BIN",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-2",
+      "productId": "mock-product-2",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:49:01.286Z",
+      "processedAt": "2026-11-02T17:49:01.286Z",
+      "productClass": "BOX_GREEN",
+      "colorClass": "GREEN",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "MANUAL_REVIEW",
+      "confidence": 0.67,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_GREEN",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "MANUAL_REVIEW",
+      "destinationBin": "MANUAL_REVIEW",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-3",
+      "productId": "mock-product-3",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:48:01.286Z",
+      "processedAt": "2026-11-02T17:48:01.286Z",
+      "productClass": "BOX_RED",
+      "colorClass": "RED",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_RED",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-4",
+      "productId": "mock-product-4",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:47:01.286Z",
+      "processedAt": "2026-11-02T17:47:01.286Z",
+      "productClass": "BOX_BLUE",
+      "colorClass": "BLUE",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_BLUE",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-5",
+      "productId": "mock-product-5",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:46:01.286Z",
+      "processedAt": "2026-11-02T17:46:01.286Z",
+      "productClass": "BOX_GREEN",
+      "colorClass": "GREEN",
+      "sizeClass": "MEDIUM",
+      "defectClasses": ["DAMAGED"],
+      "qualityStatus": "DEFECTIVE",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_GREEN",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "REJECT",
+      "destinationBin": "REJECT_BIN",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-6",
+      "productId": "mock-product-6",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:45:01.286Z",
+      "processedAt": "2026-11-02T17:45:01.286Z",
+      "productClass": "BOX_RED",
+      "colorClass": "RED",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "MANUAL_REVIEW",
+      "confidence": 0.67,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_RED",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "MANUAL_REVIEW",
+      "destinationBin": "MANUAL_REVIEW",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-7",
+      "productId": "mock-product-7",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:44:01.286Z",
+      "processedAt": "2026-11-02T17:44:01.286Z",
+      "productClass": "BOX_BLUE",
+      "colorClass": "BLUE",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_BLUE",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-8",
+      "productId": "mock-product-8",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:43:01.286Z",
+      "processedAt": "2026-11-02T17:43:01.286Z",
+      "productClass": "BOX_GREEN",
+      "colorClass": "GREEN",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_GREEN",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-9",
+      "productId": "mock-product-9",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:42:01.286Z",
+      "processedAt": "2026-11-02T17:42:01.286Z",
+      "productClass": "BOX_RED",
+      "colorClass": "RED",
+      "sizeClass": "MEDIUM",
+      "defectClasses": ["DAMAGED"],
+      "qualityStatus": "DEFECTIVE",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_RED",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "REJECT",
+      "destinationBin": "REJECT_BIN",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-10",
+      "productId": "mock-product-10",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:41:01.286Z",
+      "processedAt": "2026-11-02T17:41:01.286Z",
+      "productClass": "BOX_BLUE",
+      "colorClass": "BLUE",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "MANUAL_REVIEW",
+      "confidence": 0.67,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_BLUE",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "MANUAL_REVIEW",
+      "destinationBin": "MANUAL_REVIEW",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    },
+    {
+      "inspectionId": "mock-inspection-11",
+      "productId": "mock-product-11",
+      "recipeId": "mock-recipe",
+      "capturedAt": "2026-11-02T17:40:01.286Z",
+      "processedAt": "2026-11-02T17:40:01.286Z",
+      "productClass": "BOX_GREEN",
+      "colorClass": "GREEN",
+      "sizeClass": "MEDIUM",
+      "defectClasses": [],
+      "qualityStatus": "GOOD",
+      "confidence": 0.96,
+      "boundingBoxes": [
+        {
+          "x": 190,
+          "y": 150,
+          "width": 220,
+          "height": 170,
+          "label": "BOX_GREEN",
+          "confidence": 0.96
+        }
+      ],
+      "geometry": {
+        "sourceWidth": 640,
+        "sourceHeight": 480
+      },
+      "visualWidth": 220,
+      "visualHeight": 170,
+      "estimatedPhysicalDimensions": {
+        "widthMm": 55,
+        "heightMm": 42.5,
+        "method": "mock",
+        "depthAvailable": false
+      },
+      "modelName": "demo-model",
+      "modelVersion": "mock",
+      "decision": "PASS",
+      "destinationBin": "BIN_A",
+      "processingLatencyMs": 42,
+      "simulation": false,
+      "recipeVersion": 1
+    }
+  ],
+  "queue": [
+    {
+      "productId": "mock-product-0",
+      "publicCode": "MOCK-1001",
+      "recipeId": "mock-recipe",
+      "inspectionId": "mock-inspection-0",
+      "stage": "QUEUED",
+      "simulation": false,
+      "destinationBin": "BIN_A",
+      "decision": "PASS",
+      "detectedAt": "2026-11-02T17:51:01.286Z",
+      "queuedAt": "2026-11-02T17:51:01.286Z",
+      "sortDueAt": "2026-11-02T17:52:01.286Z"
+    },
+    {
+      "productId": "mock-product-1",
+      "publicCode": "MOCK-1002",
+      "recipeId": "mock-recipe",
+      "inspectionId": "mock-inspection-1",
+      "stage": "QUEUED",
+      "simulation": false,
+      "destinationBin": "REJECT_BIN",
+      "decision": "REJECT",
+      "detectedAt": "2026-11-02T17:50:01.286Z",
+      "queuedAt": "2026-11-02T17:50:01.286Z",
+      "sortDueAt": "2026-11-02T17:52:01.286Z"
+    },
+    {
+      "productId": "mock-product-2",
+      "publicCode": "MOCK-1003",
+      "recipeId": "mock-recipe",
+      "inspectionId": "mock-inspection-2",
+      "stage": "QUEUED",
+      "simulation": false,
+      "destinationBin": "MANUAL_REVIEW",
+      "decision": "MANUAL_REVIEW",
+      "detectedAt": "2026-11-02T17:49:01.286Z",
+      "queuedAt": "2026-11-02T17:49:01.286Z",
+      "sortDueAt": "2026-11-02T17:52:01.286Z"
+    }
+  ],
+  "statistics": {
+    "id": 1,
+    "date": "2026-11-02",
+    "hour": null,
+    "totalProducts": 2450,
+    "defectiveProducts": 90,
+    "redProducts": 1000,
+    "blueProducts": 800,
+    "greenProducts": 650,
+    "yellowProducts": 0,
+    "defectiveRate": 3.7
+  },
+  "dashboard": {
+    "conveyorStatus": {
+      "speed": 55,
+      "isRunning": true,
+      "isEmergencyStopped": false,
+      "isFireDetected": false,
+      "fireDeviceEpoch": "mock",
+      "lastFireGeneration": 0,
+      "isFireGenerationFault": false,
+      "temperature": 26.4,
+      "humidity": 46,
+      "fanActive": false,
+      "lastUpdated": "2026-11-02T17:51:01.286Z"
+    },
+    "todayStatistics": {
+      "id": 1,
+      "date": "2026-11-02",
+      "hour": null,
+      "totalProducts": 2450,
+      "defectiveProducts": 90,
+      "redProducts": 1000,
+      "blueProducts": 800,
+      "greenProducts": 650,
+      "yellowProducts": 0,
+      "defectiveRate": 3.7
+    },
+    "recentProducts": [
+      {
+        "id": 1,
+        "barcode": "MOCK-1001",
+        "color": "RED",
+        "status": "OK",
+        "passedAt": "2026-11-02T17:51:01.286Z"
+      },
+      {
+        "id": 2,
+        "barcode": "MOCK-1002",
+        "color": "BLUE",
+        "status": "DEFECTIVE",
+        "passedAt": "2026-11-02T17:50:01.286Z"
+      },
+      {
+        "id": 3,
+        "barcode": "MOCK-1003",
+        "color": "GREEN",
+        "status": "DEFECTIVE",
+        "passedAt": "2026-11-02T17:49:01.286Z"
+      },
+      {
+        "id": 4,
+        "barcode": "MOCK-1004",
+        "color": "RED",
+        "status": "OK",
+        "passedAt": "2026-11-02T17:48:01.286Z"
+      },
+      {
+        "id": 5,
+        "barcode": "MOCK-1005",
+        "color": "BLUE",
+        "status": "OK",
+        "passedAt": "2026-11-02T17:47:01.286Z"
+      }
+    ],
+    "activeAlerts": [
+      {
+        "id": 1,
+        "alertType": "HIGH_TEMPERATURE",
+        "isActive": true,
+        "triggeredAt": "2026-11-02T17:46:01.286Z",
+        "resolvedAt": null
+      }
+    ]
+  },
+  "calibration": {
+    "id": "mock-calibration",
+    "name": "Demo camera calibration",
+    "description": "Example values; no hardware was calibrated.",
+    "isActive": true,
+    "version": 1,
+    "simulationDataPresent": false,
+    "updatedAt": "2026-11-02T17:51:01.286Z",
+    "definition": {
+      "sourceWidth": 640,
+      "sourceHeight": 480,
+      "pixelsPerMillimeter": 4,
+      "orientationDegrees": 0,
+      "flipHorizontal": false,
+      "flipVertical": false,
+      "gateMappings": [],
+      "tofBaseline": {
+        "source": "NOT_INTEGRATED"
+      },
+      "hardwareActuationEnabled": false,
+      "hardwareActuationConfirmed": false
+    }
+  },
+  "simulation": {
+    "enabled": false,
+    "active": false,
+    "latched": false,
+    "inFlightSimulatedProducts": 0
+  },
+  "diagnostics": {
+    "api": "MOCK",
+    "database": "MOCK",
+    "mqtt": "MOCK",
+    "vision": "MOCK",
+    "camera": "MOCK",
+    "esp32": "MOCK",
+    "signalR": "MOCK",
+    "lastInspectionAt": "2026-11-02T17:51:01.286Z",
+    "modelStatus": "mock",
+    "modelName": "demo-model",
+    "modelVersion": "mock",
+    "simulation": {
+      "enabled": false,
+      "active": false,
+      "latched": false,
+      "inFlightSimulatedProducts": 0
+    },
+    "hardwareActuationEnabled": false,
+    "environment": "Mock preview",
+    "activeRecipe": "DemoBox",
+    "timeOfFlightSource": "NOT_INTEGRATED",
+    "cameraStreamUrl": "/api/camera/preview",
+    "frameWidth": 640,
+    "frameHeight": 480,
+    "model": {
+      "status": "mock",
+      "configured": false,
+      "loaded": false,
+      "task": "detect",
+      "loadError": "No model is running in mock mode."
+    }
+  },
+  "dataset": {
+    "sessionId": "mock-session",
+    "recipeId": "mock-recipe",
+    "recipeName": "DemoBox",
+    "status": "ACTIVE",
+    "productClass": "BOX_RED",
+    "qualityLabel": "GOOD",
+    "colorLabel": "RED",
+    "sizeLabel": "MEDIUM",
+    "defectLabels": [],
+    "captureMode": "manual",
+    "imageCount": 3,
+    "classCounts": {
+      "BOX_RED": 3
+    },
+    "qualityCounts": {
+      "GOOD": 3
+    },
+    "defectCounts": {},
+    "startedAt": "2026-11-02T17:31:01.286Z",
+    "simulation": false,
+    "labelStatus": "Mock samples; bounding boxes are not annotated.",
+    "recentSamples": [
+      {
+        "sampleId": "mock-sample-0",
+        "fileName": "mock-0.svg",
+        "capturedAt": "2026-11-02T17:51:01.286Z",
+        "productClass": "BOX_RED",
+        "qualityLabel": "GOOD",
+        "colorLabel": "RED",
+        "sizeLabel": "MEDIUM",
+        "defectLabels": [],
+        "trigger": "manual",
+        "frameRole": "dataset",
+        "sourceWidth": 640,
+        "sourceHeight": 480,
+        "captureSource": "mock"
+      },
+      {
+        "sampleId": "mock-sample-1",
+        "fileName": "mock-1.svg",
+        "capturedAt": "2026-11-02T17:50:01.286Z",
+        "productClass": "BOX_RED",
+        "qualityLabel": "GOOD",
+        "colorLabel": "RED",
+        "sizeLabel": "MEDIUM",
+        "defectLabels": [],
+        "trigger": "manual",
+        "frameRole": "dataset",
+        "sourceWidth": 640,
+        "sourceHeight": 480,
+        "captureSource": "mock"
+      },
+      {
+        "sampleId": "mock-sample-2",
+        "fileName": "mock-2.svg",
+        "capturedAt": "2026-11-02T17:49:01.286Z",
+        "productClass": "BOX_RED",
+        "qualityLabel": "GOOD",
+        "colorLabel": "RED",
+        "sizeLabel": "MEDIUM",
+        "defectLabels": [],
+        "trigger": "manual",
+        "frameRole": "dataset",
+        "sourceWidth": 640,
+        "sourceHeight": 480,
+        "captureSource": "mock"
+      }
+    ]
+  },
+  "camera": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"480\" viewBox=\"0 0 640 480\">\n<rect width=\"640\" height=\"480\" fill=\"#111827\"/><path d=\"M0 130h640v220H0z\" fill=\"#334155\"/>\n<path d=\"M0 160h640M0 320h640\" stroke=\"#64748b\" stroke-width=\"5\"/>\n<rect x=\"190\" y=\"155\" width=\"220\" height=\"165\" rx=\"8\" fill=\"#dc2626\"/>\n<path d=\"M300 155v165\" stroke=\"#fca5a5\" stroke-width=\"20\"/>\n<g fill=\"#e2e8f0\" font-family=\"sans-serif\" text-anchor=\"middle\"><text x=\"320\" y=\"55\" font-size=\"24\">MOCK CAMERA</text>\n<text x=\"320\" y=\"410\" font-size=\"18\">Illustration only - no live camera</text></g></svg>"
+}

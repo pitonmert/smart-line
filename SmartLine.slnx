@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="SmartLine.API/SmartLine.API.csproj" />
-  <Project Path="SmartLine.API.Tests/SmartLine.API.Tests.csproj" />
-</Solution>

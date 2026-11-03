@@ -1,0 +1,4 @@
+# Historical example PEM wrapper; the body contains only a placeholder.
+c9f1832e1ee04e21567c2da54dd0c2f281182e49:SmartLine.Firmware/include/MqttTlsConfig.h.example:private-key:21
+# Historical roadmap prose, not a credential assignment.
+c9f1832e1ee04e21567c2da54dd0c2f281182e49:docs/roadmap.md:generic-api-key:115

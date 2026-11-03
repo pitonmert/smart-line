@@ -1,0 +1,15 @@
+# DemoBox object-detection baseline. YOLO26n is the starting size.
+# Do not start this run until a real labeled dataset exists.
+# The Kaggle notebook overrides device to the CUDA GPU after it prints the GPU name.
+model: yolo26n.pt
+task: detect
+dataset: tools/training/data/demobox
+epochs: 50
+imgsz: 640
+batch: 16
+device: cpu
+workers: 8
+patience: 20
+seed: 42
+project: runs/smartline
+name: demobox-detect

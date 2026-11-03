@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>SmartLine Dashboard</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script>try { document.documentElement.dataset.theme=localStorage.getItem('smartline.theme')==='light'?'light':'dark'; document.documentElement.lang=localStorage.getItem('smartline.language')==='tr'?'tr':'en'; } catch {}</script>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/vendor/chart.umd.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body data-mock="{{ mock|yesno:'true,false' }}">
+  <a class="skip-link" href="#content" data-i18n="Skip to content">Skip to content</a>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="SmartLine"><span class="brand-mark">S</span><strong>SmartLine</strong><span class="brand-caption" data-i18n="Production monitoring">Production monitoring</span></a>
+      <div class="line-summary"><span id="line-state">…</span><span id="active-recipe">—</span><span id="connection" role="status">…</span></div>
+      <div class="header-utilities">
+        <div class="segmented" role="group" aria-label="Language" data-i18n-label="Language"><button type="button" lang="tr" data-language="tr" aria-label="Türkçe">TR</button><button type="button" lang="en" data-language="en" aria-label="English">EN</button></div>
+        <button id="theme-toggle" type="button" class="utility-button" data-i18n="Light">Light</button>
+        <button id="fullscreen" type="button" class="utility-button" data-i18n="Full screen">Full screen</button>
+        <time id="clock" class="header-clock"></time>
+      </div>
+    </header>
+    <nav class="main-nav" aria-label="Main navigation" data-i18n-label="Main navigation">
+      <a href="/" data-i18n="Production">Production</a><a href="/history" data-i18n="History">History</a><a href="/management" data-i18n="Management">Management</a>
+    </nav>
+    <main id="content" class="page-content" tabindex="-1">
+      {% if mock %}<div class="mock-banner"><strong data-i18n="MOCK PREVIEW — no hardware or API connection">MOCK PREVIEW — no hardware or API connection</strong><span data-i18n="Read-only example data. No command is sent to a device.">Read-only example data. No command is sent to a device.</span></div>{% endif %}
+      <div id="connection-banner" class="connection-banner" role="status" hidden></div>
+      <div id="fire-overlay" class="fire-banner critical-overlay" role="alert" hidden>
+        <div><strong id="fire-title" data-i18n="FIRE ALARM">FIRE ALARM</strong><p id="fire-message"></p><p id="fire-error" class="error-note" hidden></p></div>
+        <div class="toolbar"><button id="resolve-fire" class="danger-button utility-button" type="button" data-i18n="Resolve alarm" hidden>Resolve alarm</button></div>
+      </div>
+      <div id="page"></div>
+    </main>
+  </div>
+</body>
+</html>

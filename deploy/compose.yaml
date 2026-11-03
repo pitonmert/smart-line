@@ -1,0 +1,137 @@
+name: smartline
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartline_python}
+      POSTGRES_USER: ${POSTGRES_USER:-smartline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - python_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    entrypoint: ["/mosquitto/entrypoint.sh"]
+    environment:
+      MQTT_API_PASSWORD: ${MQTT_API_PASSWORD}
+      MQTT_FIRMWARE_PASSWORD: ${MQTT_FIRMWARE_PASSWORD}
+      MQTT_VISION_PASSWORD: ${MQTT_VISION_PASSWORD}
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/ca.crt:/mosquitto/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/mosquitto.crt:/mosquitto/cert-source/mosquitto.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/mosquitto.key:/mosquitto/cert-source/mosquitto.key:ro
+      - mosquitto_data:/mosquitto/data
+    tmpfs:
+      - /mosquitto/runtime:size=1m,mode=0700
+    ports: ["8883:8883"]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8883"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    environment:
+      SMARTLINE_ENV: production
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-smartline.local,localhost,127.0.0.1,web}
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: 8443
+      HTTPS_CERT_PATH: /run/smartline/certs/smartline.local.crt
+      HTTPS_KEY_PATH: /run/smartline/certs/smartline.local.key
+      SSL_CERT_FILE: /run/smartline/certs/ca.crt
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-smartline_python}
+      DB_USER: ${POSTGRES_USER:-smartline}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 8883
+      MQTT_CLIENT_ID: smartline-api
+      MQTT_USERNAME: smartline-api
+      MQTT_PASSWORD: ${MQTT_API_PASSWORD}
+      MQTT_CA_CERT_PATH: /run/smartline/certs/ca.crt
+      MQTT_CLIENT_CERT_PATH: /run/smartline/certs/smartline-api.crt
+      MQTT_CLIENT_KEY_PATH: /run/smartline/certs/smartline-api.key
+      VISION_URL: http://vision:8090
+      VISION_CAPTURE_TIMEOUT_SECONDS: ${VISION_CAPTURE_TIMEOUT_SECONDS:-35}
+      DATASET_ROOT: /var/lib/smartline/datasets
+    volumes:
+      - python_datasets:/var/lib/smartline/datasets
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-api.crt:/run/smartline/cert-source/smartline-api.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-api.key:/run/smartline/cert-source/smartline-api.key:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline.local.crt:/run/smartline/cert-source/smartline.local.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline.local.key:/run/smartline/cert-source/smartline.local.key:ro
+    tmpfs: ["/run/smartline/certs:size=1m,mode=0700"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      mosquitto: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('https://smartline.local:8443/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    ports: ["443:8443"]
+    networks:
+      backend:
+        aliases: [smartline.local]
+
+  vision:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: vision
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 8883
+      MQTT_CLIENT_ID: smartline-vision
+      MQTT_USERNAME: smartline-vision
+      MQTT_PASSWORD: ${MQTT_VISION_PASSWORD}
+      MQTT_CA_CERT_PATH: /run/smartline/certs/ca.crt
+      MQTT_CLIENT_CERT_PATH: /run/smartline/certs/smartline-vision.crt
+      MQTT_CLIENT_KEY_PATH: /run/smartline/certs/smartline-vision.key
+      SSL_CERT_FILE: /run/smartline/certs/ca.crt
+      CAM_STREAM_URL: ${CAM_STREAM_URL}
+      CAM_CAPTURE_URL: ${CAM_CAPTURE_URL:-}
+      VISION_CONTROL_HOST: 0.0.0.0
+      STILL_CAPTURE_TIMEOUT: ${STILL_CAPTURE_TIMEOUT:-30}
+      MODEL_PATH: ${MODEL_PATH:-}
+      MODEL_VERSION: ${MODEL_VERSION:-}
+      API_BASE_URL: https://smartline.local:8443
+      ALLOW_PREVIEW_FALLBACK: "false"
+      SHOW_PREVIEW: "false"
+    volumes:
+      - ./models:/opt/smartline/models:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/ca.crt:/run/smartline/cert-source/ca.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-vision.crt:/run/smartline/cert-source/smartline-vision.crt:ro
+      - ${SMARTLINE_CERT_DIR:-./certs/generated}/smartline-vision.key:/run/smartline/cert-source/smartline-vision.key:ro
+    tmpfs: ["/run/smartline/certs:size=1m,mode=0700"]
+    depends_on:
+      mosquitto: {condition: service_healthy}
+      web: {condition: service_healthy}
+    restart: unless-stopped
+    networks: [backend]
+
+volumes:
+  python_postgres_data:
+  python_datasets:
+  mosquitto_data:
+
+networks:
+  backend:

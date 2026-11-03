@@ -1,0 +1,23 @@
+{
+  "RECIPE_INVALID": "The recipe is invalid or incompatible with the model.",
+  "CALIBRATION_INVALID": "The calibration is invalid for this inspection.",
+  "SIMULATION_DISABLED": "Simulation is disabled.",
+  "TRACKING_TRANSITION_INVALID": "This product state transition is not allowed.",
+  "DATASET_INVALID": "The dataset operation could not be completed.",
+  "VISION_UNAVAILABLE": "Vision or camera is unavailable.",
+  "VISION_TIMEOUT": "The Vision request timed out.",
+  "VISION_INVALID": "Vision returned an invalid result.",
+  "MOCK_READ_ONLY": "Mock preview is read-only. No operation was performed.",
+  "REQUEST_INVALID": "Invalid request data.",
+  "RESOURCE_NOT_FOUND": "The requested record was not found.",
+  "PRODUCT_BARCODE_DUPLICATE": "This barcode has already been used.",
+  "PRODUCT_COLOR_INVALID": "Invalid product color.",
+  "PRODUCT_STATUS_INVALID": "Invalid product status.",
+  "CONVEYOR_MUST_BE_STOPPED": "Stop the conveyor before changing its speed.",
+  "CONVEYOR_EMERGENCY_LATCHED": "Reset the emergency-stop latch before starting the conveyor.",
+  "FIRE_SENSOR_ACTIVE": "The fire sensor is active; the latch cannot be reset.",
+  "FIRE_GENERATION_MISMATCH": "Invalid fire safety counter. Reprovision the device before resetting the latch.",
+  "MQTT_UNAVAILABLE": "The device connection is unavailable. The operation was not performed.",
+  "DATABASE_CONFLICT": "The record changed during this operation. Please try again.",
+  "UNEXPECTED_ERROR": "An unexpected error occurred."
+}
